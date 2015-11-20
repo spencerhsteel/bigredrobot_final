@@ -1,0 +1,12 @@
+# Action Constants
+int8 LEFT_ARM=0
+int8 RIGHT_ARM=1
+int8 ACTION_OPEN_GRIPPER=0
+int8 ACTION_CLOSE_GRIPPER=1
+int8 ACTION_MOVE_TO=2
+int8 ACTION_MOVE_OVER=3
+int8 ACTION_IDLE=4
+int8[2] action
+int8[2] target
+---
+bool success

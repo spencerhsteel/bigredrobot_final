@@ -1,0 +1,10 @@
+<launch>
+  <rosparam>
+    num_blocks: 6
+    configuration: "stacked_ascending"
+    num_arms: 2
+    symbolic_only: false
+  </rosparam>
+  <node name="robot_interface" pkg="bigredrobot_proj1" type="robot_interface.py" />
+  <node name="controller" pkg="bigredrobot_proj1" type="controller.py" />
+</launch>
