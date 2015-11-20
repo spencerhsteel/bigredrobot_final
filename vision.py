@@ -1,18 +1,40 @@
 import cv2 as cv
 import numpy as np
-
+import rospy
+from cv_bridge import CvBridge, CvBridgeError
 
 
 class Vision:
     def __init__(self):
         self.FRAME_WIDTH = 640
-        self.FRAME_HEIGHT = 480
+        self.FRAME_HEIGHT = 400
         self.capture = cv.VideoCapture(0)
         self.capture.set(4, self.FRAME_WIDTH)
         self.capture.set(5, self.FRAME_HEIGHT)  
         self.MAX_NUM_OBJECTS = 50
         self.MIN_OBJECT_AREA = 15*15
         self.MAX_OBJECT_AREA = self.FRAME_HEIGHT*self.FRAME_WIDTH/1.5
+
+        cv.namedWindow("Baxter Image", 1)
+        self.bridge = CvBridge()
+        self.image_sub = rospy.Subscriber("/cameras/left_hand_camera/image",Image,self.callback)
+
+    def callback(self,data):
+       try:
+         cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+       except CvBridgeError, e:
+         print e
+       (rows,cols,channels) = cv_image.shape
+       if cols > 60 and rows > 60 :
+       cv.circle(cv_image, (50,50), 10, 255)
+   
+       cv.imshow("Image window", cv_image)
+       cv.waitKey(3)
+   
+       try:
+         self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image, "bgr8"))
+       except CvBridgeError, e:
+         print e
 
     def on_trackbar(self,value):
         return 0
