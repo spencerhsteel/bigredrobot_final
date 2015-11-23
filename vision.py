@@ -4,8 +4,9 @@ import rospy
 import std_srvs.srv
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
+from baxter_interface import camera
 
-
+# http://www.pages.drexel.edu/~nk752/Visual_Servoing_Article_Part_1.pdf
 class Vision:
     def __init__(self):
         self.FRAME_WIDTH = 640
@@ -17,10 +18,39 @@ class Vision:
         self.MIN_OBJECT_AREA = 15*15
         self.MAX_OBJECT_AREA = self.FRAME_HEIGHT*self.FRAME_WIDTH/1.5
         
-        rospy.ServiceProxy('/cameras/open \'{name: left_hand_camera, settings: {width: 480, height: 300}}\'', std_srvs.srv.Empty)
+        self.cam_ctrl = camera.CameraController('right_hand_camera')
+        #self.cam_ctrl.exposure(50) # set exposure 0-100 or cam_ctrl.CONTROL_AUTO
+
+        # arm camera params (right arm values, based on /cameras/.../camera_info_std)
+        self.fx = 397.22543258146163
+        self.fy = 397.9222130030984
+        self.cx = 602.7031818165118
+        self.cy = 415.42196609153905
+
+        self.intrinsics = {'fx':self.fx, 'fy':self.fy, 'cx':self.cx, 'cy':self.cy}
+
+        rospy.ServiceProxy('/cameras/close \'left_hand_camera\'', std_srvs.srv.Empty)
+        rospy.ServiceProxy('/cameras/open \'{name: right_hand_camera, settings: {width: 480, height: 300}}\'', std_srvs.srv.Empty)
         self.bridge = CvBridge()
-        self.image_sub = rospy.Subscriber("/cameras/left_hand_camera/image",Image,self.callback)
-  
+        self.image_sub = rospy.Subscriber("/cameras/right_hand_camera/image",Image,self.callback)
+
+
+
+    def img_xy_from_uv(self, u, v):
+        intr = self.instrinsics
+        x = (u - intr['cx']) / intr['f']
+        x = (v - intr['cy']) / intr['f']
+        return x, y
+
+    def interaction_matrix(self, x, y, Z):
+        L = numpy.array([[-1/Z, 0, x/Z, x*y, -(1+x**2), y],
+                         [0, -1/Z, y/Z, 1+y**2, -x*y, -x]])
+        return L
+
+    
+    def get_desired_feat_velocities(self, u, v):
+        pass
+        
 
     def callback(self,data):
        try:
@@ -28,35 +58,15 @@ class Vision:
        except CvBridgeError, e:
          print e
        self.frame = cv_image
-   
-       #cv.imshow("Image window", cv_image)
        cv.waitKey(3)
 
     def on_trackbar(self,value):
         return 0
 
-    def drawCrosshairs(self,x,y):
-        x=int(x)
-        y=int(y)
-        cv.circle(self.frame,(x,y),20,(0,255,0),2)
-        if (y-25)>0:
-            cv.line(self.frame, (x,y), (x,y-25), (0, 255, 0), 2)
-        else:
-            cv.line(self.frame, (x,y), (x,0), (0, 255, 0), 2);
-        if (y+25)<self.FRAME_HEIGHT:
-            cv.line(self.frame, (x,y), (x,y + 25), (0, 255, 0), 2)
-        else:
-            cv.line(self.frame, (x,y), (x,self.FRAME_HEIGHT), (0, 255, 0), 2)
-        if (x-25)>0:
-            cv.line(self.frame, (x,y), (x-25,y), (0, 255, 0), 2)
-        else:
-            cv.line(self.frame, (x,y), (0,y), (0, 255, 0), 2)
-        if (x+25)<self.FRAME_WIDTH:
-            cv.line(self.frame, (x,y), (x+25,y), (0, 255, 0), 2)
-        else:
-            cv.line(self.frame, (x,y), (self.FRAME_WIDTH,y), (0, 255, 0), 2)
-
-    def trackFilteredObject(self,temp):
+    def trackFilteredObject(self,oldtemp):
+        # RENAME EVERYTHING
+        kernel = np.ones((5,5),np.uint8)
+        temp = cv.morphologyEx(oldtemp, cv.MORPH_OPEN, kernel)
         contours, hierarchy = cv.findContours(temp.copy(), cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
         max_area = 0
         best_cnt = None
@@ -67,39 +77,14 @@ class Vision:
             best_cnt = cnt
 
         if best_cnt is None:
-          self.objectx = -1
-          self.objecty = -1
+          x = -1
+          y = -1
         else:     
           moment = cv.moments(best_cnt)
           area = moment['m00']
-          self.objectx = int(moment['m10']/area)
-          self.objecty = int(moment['m01']/area)        
-
-        '''
-        refArea = 0
-        indexFound = -1
-        if hierarchy is not None:
-            if hierarchy.shape[1] > 0:
-                numObjects = hierarchy.shape[1]
-                if numObjects < self.MAX_NUM_OBJECTS:
-                    index = 0
-                    while index >= 0:
-                        moment = cv.moments(contours[index])
-                        area2 = moment['m00']
-                        if (area2>self.MIN_OBJECT_AREA) and (area2<self.MAX_OBJECT_AREA) and (area2>refArea):
-                            self.objectx = moment['m10']/area2
-                            self.objecty = moment['m01']/area2
-                            self.objectFound = True
-                            refArea = area2
-                            indexFound = index
-                        else:
-                            self.objectFound = False
-                            self.objectx = -1
-                            self.objecty = -1
-                        index = hierarchy[0][index][0]		
-                    if self.objectFound == True:
-                        self.area = refArea
-        '''
+          x = int(moment['m10']/area)
+          y = int(moment['m01']/area) 
+        return x, y, temp     
 
     def run(self):
         rospy.init_node('VisionTest', anonymous=True)
@@ -118,7 +103,6 @@ class Vision:
         while not rospy.is_shutdown():
 
             #_, self.frame = self.capture.read()
-
             self.frame = cv.blur(self.frame, (3,3))
 
             #converting to HSV
@@ -136,32 +120,30 @@ class Vision:
             lower_hsv = np.array([hmin, smin, vmin])
             upper_hsv = np.array([hmax, smax, vmax])
 
-            mask = cv.inRange(hsv,lower_hsv, upper_hsv)
+            mask_trackbar = cv.inRange(hsv,lower_hsv, upper_hsv)
 
-            result = cv.bitwise_and(self.frame,self.frame,mask = mask)
-            
-            params = cv.SimpleBlobDetector_Params()
-            params.minThreshold = 0
-            params.maxThreshold = 255
+            lower_hsv_orng = np.array([1,81,104])
+            upper_hsv_orng = np.array([10,219,255])
+            mask_orng = cv.inRange(hsv,lower_hsv_orng, upper_hsv_orng)
 
-            detector = cv.SimpleBlobDetector(params)
+            lower_hsv_pink = np.array([170,14,150])
+            upper_hsv_pink = np.array([179,220,255])
+            mask_pink = cv.inRange(hsv,lower_hsv_pink, upper_hsv_pink)
+                      
+            track_x, track_y, mask3 = self.trackFilteredObject(mask_trackbar)
+            orng_x, orng_y, mask1 = self.trackFilteredObject(mask_orng)
+            pink_x, pink_y, mask2 = self.trackFilteredObject(mask_pink)
 
-            keypoints = detector.detect(mask)
-
-            im_keypoints = cv.drawKeypoints(mask, keypoints, np.array([]), (0,0,255), cv.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-
-            self.trackFilteredObject(mask)
-
-            kernel = np.ones((5,5),np.uint8)
-            opening = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
-
-            #self.drawCrosshairs(self.objectx, self.objecty)
+       
             display = self.frame.copy()
-            cv.circle(display, (self.objectx, self.objecty), 10, 255, -1) 
+            cv.circle(display, (track_x, track_y), 10, 255, -1) 
+            cv.circle(display, (orng_x, orng_y), 10, (0,0,255), -1) 
+            cv.circle(display, (pink_x, pink_y), 10, (0,255,0), -1) 
 
-            cv.imshow('Opened img', opening)
-            cv.imshow('Thresh',mask)
-            cv.imshow('result',display)
+            cv.imshow('Thresh orange',mask1)
+            cv.imshow('Thresh pink',mask2)
+            cv.imshow('Thresh trackbar',mask3)
+            cv.imshow('result', display)
 
             k = cv.waitKey(5) & 0xFF
             if k == 27:
