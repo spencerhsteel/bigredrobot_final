@@ -5,6 +5,9 @@ import std_srvs.srv
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from baxter_interface import camera
+import helper_functions as hf
+import baxter_interface
+from baxter_interface import CHECK_VERSION
 
 # http://www.pages.drexel.edu/~nk752/Visual_Servoing_Article_Part_1.pdf
 class Vision:
@@ -30,27 +33,36 @@ class Vision:
         self.intrinsics = {'fx':self.fx, 'fy':self.fy, 'cx':self.cx, 'cy':self.cy}
 
         rospy.ServiceProxy('/cameras/close \'left_hand_camera\'', std_srvs.srv.Empty)
-        rospy.ServiceProxy('/cameras/open \'{name: right_hand_camera, settings: {width: 480, height: 300}}\'', std_srvs.srv.Empty)
+        rospy.ServiceProxy('/cameras/open \'{name: right_hand_camera, settings: {width: 640, height: 400}}\'', std_srvs.srv.Empty)
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/cameras/right_hand_camera/image",Image,self.callback)
 
-
-
     def img_xy_from_uv(self, u, v):
-        intr = self.instrinsics
-        x = (u - intr['cx']) / intr['f']
-        x = (v - intr['cy']) / intr['f']
+        intr = self.intrinsics
+        x = (u - intr['cx']) / intr['fx']
+        y = (v - intr['cy']) / intr['fy']
         return x, y
 
     def interaction_matrix(self, x, y, Z):
-        L = numpy.array([[-1/Z, 0, x/Z, x*y, -(1+x**2), y],
+        L = np.array([[-1/Z, 0, x/Z, x*y, -(1+x**2), y],
                          [0, -1/Z, y/Z, 1+y**2, -x*y, -x]])
         return L
 
-    
-    def get_desired_feat_velocities(self, u, v):
-        pass
+    def calc_desired_feat_velocities(self, u, v, k0=1):
+        # velocity point toward image center from current feature point
+        center = np.array([self.FRAME_WIDTH/2, self.FRAME_HEIGHT/2])
+        current = np.array([u, v])
+        velocity = k0*(center-current)
+        print 'center:', center
+        print 'current:', current
+        return np.matrix(velocity).T
         
+    def calc_end_velocities(self, u, v, Z):
+        x, y = self.img_xy_from_uv(u, v)
+        L = self.interaction_matrix(x, y, Z)
+        s = self.calc_desired_feat_velocities(u, v)
+        print 'Feat vels:', s
+        return hf.rpinv(L)*s
 
     def callback(self,data):
        try:
@@ -65,7 +77,7 @@ class Vision:
 
     def trackFilteredObject(self,oldtemp):
         # RENAME EVERYTHING
-        kernel = np.ones((5,5),np.uint8)
+        kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE,(5,5))
         temp = cv.morphologyEx(oldtemp, cv.MORPH_OPEN, kernel)
         contours, hierarchy = cv.findContours(temp.copy(), cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
         max_area = 0
@@ -76,7 +88,7 @@ class Vision:
             max_area = area
             best_cnt = cnt
 
-        if best_cnt is None:
+        if best_cnt is None or max_area<100:
           x = -1
           y = -1
         else:     
@@ -84,7 +96,7 @@ class Vision:
           area = moment['m00']
           x = int(moment['m10']/area)
           y = int(moment['m01']/area) 
-        return x, y, temp     
+        return x, y, temp  # temp is the morph-opened image   
 
     def run(self):
         rospy.init_node('VisionTest', anonymous=True)
@@ -131,19 +143,22 @@ class Vision:
             mask_pink = cv.inRange(hsv,lower_hsv_pink, upper_hsv_pink)
                       
             track_x, track_y, mask3 = self.trackFilteredObject(mask_trackbar)
-            orng_x, orng_y, mask1 = self.trackFilteredObject(mask_orng)
+            #orng_x, orng_y, mask1 = self.trackFilteredObject(mask_orng)
             pink_x, pink_y, mask2 = self.trackFilteredObject(mask_pink)
 
        
             display = self.frame.copy()
             cv.circle(display, (track_x, track_y), 10, 255, -1) 
-            cv.circle(display, (orng_x, orng_y), 10, (0,0,255), -1) 
+            #cv.circle(display, (orng_x, orng_y), 10, (0,0,255), -1) 
             cv.circle(display, (pink_x, pink_y), 10, (0,255,0), -1) 
 
-            cv.imshow('Thresh orange',mask1)
+            #cv.imshow('Thresh orange',mask1)
             cv.imshow('Thresh pink',mask2)
             cv.imshow('Thresh trackbar',mask3)
             cv.imshow('result', display)
+
+            camera_vels = self.calc_end_velocities(pink_x, pink_y, 1)
+            print camera_vels
 
             k = cv.waitKey(5) & 0xFF
             if k == 27:
