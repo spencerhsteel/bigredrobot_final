@@ -61,23 +61,27 @@ class BaxterCamera:
 
     def interaction_matrix(self, x, y, Z):
         L = np.array([[-1/Z, 0, x/Z, x*y, -(1+x**2), y],
-                         [0, -1/Z, y/Z, 1+y**2, -x*y, -x]])
+                      [0, -1/Z, y/Z, 1+y**2, -x*y, -x]])
         return L
 
-    def calc_desired_feat_velocities(self, u, v, k0=1):
+    def calc_desired_feat_velocities(self, u, v, k0=.01):
         # velocity point toward image center from current feature point
         center = np.array([self.FRAME_WIDTH/2, self.FRAME_HEIGHT/2])
         current = np.array([u, v])
         velocity = k0*(center-current)
-        print 'center:', center
-        print 'current:', current
-        return np.matrix(velocity).T
+        # print 'center:', center
+        # print 'current:', current
+    	# This will break interaction matrix code - velocity is a numpy array
+        return velocity
+        
+    def calc_desired_depth_velocity(self, Z):
+    	pass
         
     def calc_end_velocities(self, u, v, Z):
         x, y = self.img_xy_from_uv(u, v)
         L = self.interaction_matrix(x, y, Z)
         s = self.calc_desired_feat_velocities(u, v)
-        print 'Feat vels:', s
+        # print 'Feat vels:', s
         return np.array(hf.rpinv(L)*s).flatten()
 
 def track_object(mask):
@@ -92,7 +96,7 @@ def track_object(mask):
         max_area = area
         best_cnt = cnt
 
-    if best_cnt is None or max_area<100:
+    if best_cnt is None or max_area<50:
       x = -1
       y = -1
     else:     

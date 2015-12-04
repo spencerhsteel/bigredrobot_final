@@ -37,73 +37,83 @@ class Baxter:
 
 
 def run(camera):
-   
-    # Creating a window for later use
-    cv.namedWindow('result')
 
-    # Creating track bar
-    callback = lambda x: 0
-    cv.createTrackbar('hmin', 'result', 0, 179, callback)
-    cv.createTrackbar('hmax', 'result',179,179, callback)
-    cv.createTrackbar('smin', 'result',0,255, callback)
-    cv.createTrackbar('smax', 'result',255,255, callback)
-    cv.createTrackbar('vmin', 'result',0,255, callback)
-    cv.createTrackbar('vmax', 'result',255,255, callback)
-    rate = rospy.Rate(10)
-    while not rospy.is_shutdown():
+	# Creating a window for later use
+	cv.namedWindow('result')
+	tl = tf.TransformListener()
 
-        #_, self.frame = self.capture.read()
-        frame = cv.blur(camera.get_frame(), (3,3))
+	# Creating track bar
+	callback = lambda x: 0
+	cv.createTrackbar('hmin', 'result', 0, 179, callback)
+	cv.createTrackbar('hmax', 'result',179,179, callback)
+	cv.createTrackbar('smin', 'result',0,255, callback)
+	cv.createTrackbar('smax', 'result',255,255, callback)
+	cv.createTrackbar('vmin', 'result',0,255, callback)
+	cv.createTrackbar('vmax', 'result',255,255, callback)
+	rate = rospy.Rate(10)
+	while not rospy.is_shutdown():
 
-        #converting to HSV
-        hsv = cv.cvtColor(frame,cv.COLOR_BGR2HSV)
+		#_, self.frame = self.capture.read()
+		frame = cv.blur(camera.get_frame(), (3,3))
 
-        # get info from track bar and appy to result
-        hmin = cv.getTrackbarPos('hmin','result')
-        hmax = cv.getTrackbarPos('hmax','result')
-        smin = cv.getTrackbarPos('smin','result')
-        smax = cv.getTrackbarPos('smax','result')
-        vmin = cv.getTrackbarPos('vmin','result')
-        vmax = cv.getTrackbarPos('vmax','result')
+		#converting to HSV
+		hsv = cv.cvtColor(frame,cv.COLOR_BGR2HSV)
 
-        # Normal masking algorithm
-        lower_hsv = np.array([hmin, smin, vmin])
-        upper_hsv = np.array([hmax, smax, vmax])
+		# get info from track bar and appy to result
+		hmin = cv.getTrackbarPos('hmin','result')
+		hmax = cv.getTrackbarPos('hmax','result')
+		smin = cv.getTrackbarPos('smin','result')
+		smax = cv.getTrackbarPos('smax','result')
+		vmin = cv.getTrackbarPos('vmin','result')
+		vmax = cv.getTrackbarPos('vmax','result')
 
-        mask_trackbar = cv.inRange(hsv,lower_hsv, upper_hsv)
+		# Normal masking algorithm
+		# lower_hsv = np.array([0, 0, 0])
+		# upper_hsv = np.array([179, 255, 255])
+		lower_hsv = np.array([hmin, smin, vmin])
+		upper_hsv = np.array([hmax, smax, vmax])
 
-        lower_hsv_orng = np.array([1,81,104])
-        upper_hsv_orng = np.array([10,219,255])
-        mask_orng = cv.inRange(hsv,lower_hsv_orng, upper_hsv_orng)
+		mask_trackbar = cv.inRange(hsv,lower_hsv, upper_hsv)
 
-        lower_hsv_pink = np.array([170,14,150])
-        upper_hsv_pink = np.array([179,220,255])
-        mask_pink = cv.inRange(hsv,lower_hsv_pink, upper_hsv_pink)
-                  
-        track_x, track_y, mask3 = vl.track_object(mask_trackbar)
-        #orng_x, orng_y, mask1 = vl.track_object(mask_orng)
-        pink_x, pink_y, mask2 = vl.track_object(mask_pink)
+		lower_hsv_orng = np.array([1,50,10])
+		upper_hsv_orng = np.array([20,219,240])
+		mask_orng = cv.inRange(hsv,lower_hsv_orng, upper_hsv_orng)
 
-        display = frame.copy()
-        cv.circle(display, (track_x, track_y), 10, 255, -1) 
-        #cv.circle(display, (orng_x, orng_y), 10, (0,0,255), -1) 
-        cv.circle(display, (pink_x, pink_y), 10, (0,255,0), -1) 
+		lower_hsv_pink1 = np.array([160,14,10])
+		upper_hsv_pink1 = np.array([179,220,240])
+		mask_pink1 = cv.inRange(hsv,lower_hsv_pink1, upper_hsv_pink1)
+		
+		lower_hsv_pink2 = np.array([0, 14, 10])
+		upper_hsv_pink2 = np.array([8, 220, 240])
+		mask_pink2 = cv.inRange(hsv, lower_hsv_pink2, upper_hsv_pink2)
+		
+		mask_pink = cv.bitwise_or(mask_pink1, mask_pink2)
+		          
+		track_x, track_y, mask3 = vl.track_object(mask_trackbar)
+		#orng_x, orng_y, mask1 = vl.track_object(mask_orng)
+		pink_x, pink_y, mask2 = vl.track_object(mask_pink)
 
-        #cv.imshow('Thresh orange',mask1)
-        cv.imshow('Thresh pink',mask2)
-        cv.imshow('Thresh trackbar',mask3)
-        cv.imshow('result', display)
+		display = frame.copy()
+		cv.circle(display, (320, 200), 10, 255, -1) 
+		#cv.circle(display, (orng_x, orng_y), 10, (0,0,255), -1) 
+		cv.circle(display, (pink_x, pink_y), 10, (0,255,0), -1) 
 
-        visual_servo(camera, pink_x, pink_y)
-        rate.sleep()
+		#cv.imshow('Thresh orange',mask1)
+		cv.imshow('Thresh pink',mask2)
+		cv.imshow('Thresh trackbar',mask3)
+		cv.imshow('result', display)
 
-        k = cv.waitKey(5) & 0xFF
-        if k == 27:
-            break
+		visual_servo(tl, camera, pink_x, pink_y)
+		#visual_servo(tl, camera, orng_x, orng_y)
+		# rate.sleep()
 
-    camera.capture.release()
+		k = cv.waitKey(5) & 0xFF
+		if k == 27:
+		    break
 
-    cv.destroyAllWindows()
+	camera.capture.release()
+
+	cv.destroyAllWindows()
 
 def transform_test():
     tl = tf.TransformListener()
@@ -133,26 +143,25 @@ def transform_test():
             continue
         rate.sleep()
 
+# NOTE: tl is transform listener, and is passed in first
+def visual_servo(tl, camera, u, v):    
+	#	xi = camera.calc_end_velocities(u, v, Z=1)
+	xi = camera.calc_desired_feat_velocities(u, v)
+	xi = -np.append(xi, np.array([0]));
+	print xi
 
-def visual_servo(camera, u, v):
-    tl = tf.TransformListener()
-    
-    xi = camera.calc_end_velocities(u, v, Z=1)
-    print xi
+	vect = Vector3Stamped()
+	vect.header.frame_id = '/right_hand_camera'
+	vect.header.stamp = rospy.Time(0)
+	vect.vector = Vector3(*xi[0:3])
 
-    vect = Vector3Stamped()
-    vect.header.frame_id = '/right_hand_camera'
-    vect.header.stamp = rospy.Time()
-    vect.vector = Vector3(*xi[0:3])
+	try:
+		trans_vect = tl.transformVector3('/base', vect)
+		print vect.header.frame_id, vect.vector
+		print trans_vect.header.frame_id, trans_vect.vector
 
-    while not tl.canTransform('/base', vect.header.frame_id, vect.header.stamp):
-        try:
-            trans_vect = tl.transformVector3('/base', vect)
-            print vect.header.frame_id, vect.vector
-            print trans_vect.header.frame_id, trans_vect.vector
-
-        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            continue
+	except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+		print "you suck"
 
 
 if __name__=="__main__":
