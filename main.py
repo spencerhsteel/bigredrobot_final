@@ -5,7 +5,7 @@ import numpy as np
 
 import baxter_interface
 from baxter_interface import CHECK_VERSION
-from baxter_pykdl import baxter_kinematics
+
 
 from std_msgs.msg import (
     UInt16,
@@ -21,19 +21,12 @@ class Baxter:
         rospy.logwarn("Initializing Baxter")
 
         self.arm = baxter_interface.limb.Limb(arm)
-        self.kinematics = baxter_kinematics(arm)
-
-        # control parameters
-        self.pub_rate = 500.0  # Hz
 
         self.interface = baxter_interface.RobotEnable(CHECK_VERSION)
         self._init_state = self.interface.state().enabled
         self.interface.enable()
         
-        # set joint state publishing to 500Hz
-        self.rate_publisher = rospy.Publisher('robot/joint_state_publish_rate',
-                                         UInt16, queue_size=10)
-        self.rate_publisher.publish(self.pub_rate)
+
 
 
 def run(camera):
