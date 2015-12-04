@@ -6,13 +6,13 @@ import rospkg
 import xml.etree.ElementTree as ET
 from scipy import interpolate
 
-frame_dict = {  "left_s0": "left_upper_shoulder",
-                "left_s1": "left_lower_shoulder",
-                "left_e0": "left_upper_elbow",
-                "left_e1": "left_lower_elbow",
-                "left_w0": "left_upper_forearm",
-                "left_w1": "left_lower_forearm",
-                "left_w2": "left_wrist"}
+frame_dict = {  "right_s0": "right_upper_shoulder",
+                "right_s1": "right_lower_shoulder",
+                "right_e0": "right_upper_elbow",
+                "right_e1": "right_lower_elbow",
+                "right_w0": "right_upper_forearm",
+                "right_w1": "right_lower_forearm",
+                "right_w2": "right_wrist"}
 
 PLANE_FILE = '/scripts/plane.txt'
 GOAL_FILE = '/scripts/goal.txt'

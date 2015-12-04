@@ -25,7 +25,7 @@ class BaxterMotionController:
 
     KP = 0.8                # Line following proportional gain
     MOVE_SPEED = 0.07       # Velocity used when following the line
-    K0 = -10                  # Gain for the secondary objective function
+    K0 = -10                # Gain for the secondary objective function
 
 
     def __init__(self, baxter, arm):
@@ -96,13 +96,14 @@ class BaxterMotionController:
         '''
         Commands joint velocities using jacobian
         '''
+        squiggle = np.matrix(squiggle).T
         J = self._kin.jacobian()
         Jinv = hf.rpinv(J)
-        q_dot = Jinv*squiggle + (np.identity(7) - (Jinv*J))*self.get_b(self.K0, self.DELTA) 
+        q_dot = Jinv*squiggle + (np.identity(7) - (Jinv*J))*self.get_b(self.K0) 
         cmd = {joint: q_dot[i, 0] for i, joint in enumerate(self._joint_names)}
         self._arm.set_joint_velocities(cmd)
 
-    def get_b(self, k, delta):
+    def get_b(self, k):
         '''
         Secondary objective function, designed to avoid joint limits
         '''

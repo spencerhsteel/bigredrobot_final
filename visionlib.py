@@ -64,7 +64,7 @@ class BaxterCamera:
                       [0, -1/Z, y/Z, 1+y**2, -x*y, -x]])
         return L
 
-    def calc_desired_feat_velocities(self, u, v, k0=.01):
+    def calc_desired_feat_velocities(self, u, v, k0=0.001):
         # velocity point toward image center from current feature point
         center = np.array([self.FRAME_WIDTH/2, self.FRAME_HEIGHT/2])
         current = np.array([u, v])
