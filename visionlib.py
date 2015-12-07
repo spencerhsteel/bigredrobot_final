@@ -84,6 +84,44 @@ class BaxterCamera:
         # print 'Feat vels:', s
         return np.array(hf.rpinv(L)*s).flatten()
 
+class OverheadCamera:
+    def __init__(self):
+        self.FRAME_WIDTH = 640
+        self.FRAME_HEIGHT = 400
+
+        self.bridge = CvBridge()
+        self.image_sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.capture_callback)
+        self.image_sub_d = rospy.Subscriber("/camera/depth/image_raw", Image, self.depth_callback)
+        self.frame = None
+        self.depthframe = None
+
+    def capture_callback(self,data):
+       try:
+         cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+       except CvBridgeError, e:
+         print e
+       self.frame = cv_image
+       cv.waitKey(3)
+
+    def depth_callback(self,data):
+       try:
+         depth_image = self.bridge.imgmsg_to_cv2(data, "16UC1")
+       except CvBridgeError, e:
+         print e
+       self.depthframe = depth_image
+       cv.waitKey(3)
+
+    def get_frame(self):
+        while self.frame is None and not rospy.is_shutdown():
+            pass
+        return self.frame
+
+    def get_depth_frame(self):
+        while self.depthframe is None and not rospy.is_shutdown():
+            pass
+        return self.depthframe
+
+
 def track_object(mask):
     kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE,(5,5))
     morphed_mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
