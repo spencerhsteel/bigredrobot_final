@@ -74,9 +74,15 @@ class BaxterCamera:
     	# This will break interaction matrix code - velocity is a numpy array
         return velocity
         
-    def calc_desired_depth_velocity(self, Z):
-    	pass
-        
+    def calc_desired_depth_velocity(self, k0, current_pixel_area):
+        # Temporarily try and get the ball to be half of the frame width
+        # This will need to be replaced with a real number later on.
+    	desired_pixel_area = self.FRAME_WIDTH/5*self.FRAME_HEIGHT/5
+        velocity = k0*(current_pixel_area - desired_pixel_area)/1000
+        # negative so that Baxter moves down towards the ball
+        return np.array([velocity])
+
+    # Defecated        
     def calc_end_velocities(self, u, v, Z):
         x, y = self.img_xy_from_uv(u, v)
         L = self.interaction_matrix(x, y, Z)
@@ -128,6 +134,7 @@ def track_object(mask):
     contours, hierarchy = cv.findContours(morphed_mask.copy(), cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
     max_area = 0
     best_cnt = None
+    area = -1
     for cnt in contours:
       area = cv.contourArea(cnt)
       if area > max_area:
@@ -142,7 +149,7 @@ def track_object(mask):
       area = moment['m00']
       x = int(moment['m10']/area)
       y = int(moment['m01']/area) 
-    return x, y, morphed_mask
+    return x, y, morphed_mask, area
 
 if __name__=="__main__":
     v = BaxterCamera()
