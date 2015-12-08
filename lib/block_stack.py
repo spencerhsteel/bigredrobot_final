@@ -1,15 +1,26 @@
 #!/usr/bin/env python
 
-## Template for controller node
-
 import rospy
 import baxter_interface
 
 from std_msgs.msg import String
-from bigredrobot_proj1.msg import *
-from bigredrobot_proj1.srv import *
+from bigredrobot_final.msg import *
+from bigredrobot_final.srv import *
 
-class Controller():
+class BlockStackController():
+	'''
+	Create a node to control baxter (via RobotInterface) to stack blocks.
+	Start after RobotInterface intialisation.
+	
+	Example usage:
+		 try:
+		    c = BlockStackController()
+		    c.init_subscribers()
+		    c.run()
+		except rospy.ROSInterruptException:
+		    pass
+	
+	'''
     
     def __init__(self):
         rospy.init_node("controller", anonymous=True)
@@ -19,18 +30,15 @@ class Controller():
         self.blocks_over = state.blocks_over
         self.gripper_at = state.gripper_at
         self.gripper_closed = state.gripper_closed
-        self.num_arms = state.num_arms
         self.state_updated = True
 
 
     def command_update(self, command):
         self.command = command.data
 
-
     def init_subscribers(self):
         rospy.Subscriber("state", State, self.state_update)
         rospy.Subscriber("command", String, self.command_update)
-
 
     def is_scattered(self):
         if all([x <= 0 for x in self.blocks_over]):
@@ -118,47 +126,32 @@ class Controller():
         # return the topmost block in the left and right stacks
         # left arm moves even numbered blocks
         if currentblock % 2 == 0:
-            self.move_left(currentblock, top_left)
+            self.move(currentblock, top_left)
             top_left = currentblock
         else:
-            self.move_right(currentblock, top_right)
+            self.move(currentblock, top_right)
             top_right = currentblock
         return top_left, top_right
 
     def move(self, blocknum, target):
-        if self.num_arms == 1 or blocknum % 2 == 1:
-            self.move_right(blocknum, target)
-        else:
-            self.move_left(blocknum, target)
-
-    def move_left(self, blocknum, target):
-        self.bimanual_move(blocknum, target, None, None)
-
-    def move_right(self, blocknum, target):
-        self.bimanual_move(None, None, blocknum, target)
-
-            
-    def bimanual_move(self, lblocknum, ltarget, rblocknum, rtarget):
         # Execute open->move_to->close->move_over sequence in both arms, simultaneously moving blocks lblocknum and rblocknum on top of ltarget and rtarget, respectively. When block and target values are both None the respective arm will be idle.
         actions = [MoveRobotRequest.ACTION_OPEN_GRIPPER, MoveRobotRequest.ACTION_MOVE_TO,
                     MoveRobotRequest.ACTION_CLOSE_GRIPPER, MoveRobotRequest.ACTION_MOVE_OVER,
                     MoveRobotRequest.ACTION_OPEN_GRIPPER]
-        lgrip, rgrip = ltarget, rtarget # if target is none ensure gripper does not actuate
-        targets = [[lgrip,rgrip], [lblocknum, rblocknum], [lgrip,rgrip], [ltarget, rtarget], [lgrip,rgrip]]
+        targets = [lgrip,lblocknum,lgrip,ltarget,lgrip]
         for action, target in zip(actions,targets):
             req = MoveRobotRequest()
-            for arm in [MoveRobotRequest.LEFT_ARM, MoveRobotRequest.RIGHT_ARM]:               
-                if target[arm] is None:
-                    req.action[arm] = MoveRobotRequest.ACTION_IDLE
-                    req.target[arm] = 0
+                if target is None:
+                    req.action = MoveRobotRequest.ACTION_IDLE
+                    req.target = 0
                 else:                
-                    req.action[arm] = action
-                    req.target[arm] = target[arm]
+                    req.action = action
+                    req.target = target
             rospy.loginfo(req)
             self.move_robot(req)
         self.state_updated = False
         while not self.state_updated:
-	    # Block until state is updated, as this controller requires most recent state from interface
+	    	# Block until state is updated, as this controller requires most recent state from interface
             pass        
 
 
@@ -191,7 +184,7 @@ class Controller():
 
 if __name__ == '__main__':
     try:
-        c = Controller()
+        c = BlockStackController()
         c.init_subscribers()
         c.run()
     except rospy.ROSInterruptException:
