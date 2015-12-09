@@ -131,7 +131,7 @@ class BaxterMotionController:
         q_bar = np.array(q_bar)
         delta_q = np.array(delta_q) 
         
-        z = np.abs(q_bar - q)/np.square(delta_q)
+        z = (q_bar - q)/np.square(delta_q)
         
         print 'qb:', q_bar    
         print 'z:', z
