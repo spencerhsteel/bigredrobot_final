@@ -18,14 +18,16 @@ from geometry_msgs.msg import Vector3Stamped, Vector3
 import tf
 
 USE_TRACKBARS = False
-DEPTH_K0 = 0.005
-XY_K0 = 0.0005
+DEPTH_K0 = 0.001
+XY_K0 = 0.001
 
 class Baxter:
 	def __init__(self, arm):
 		rospy.logwarn("Initializing Baxter")
 
 		self.arm = baxter_interface.limb.Limb(arm)
+		self.gripper = baxter_interface.Gripper(arm)
+		self.gripper.calibrate()
 		self.kinematics = baxter_kinematics(arm)
 
 		# control parameters
@@ -39,10 +41,14 @@ class Baxter:
 		self.rate_publisher = rospy.Publisher('robot/joint_state_publish_rate',
 										 UInt16, queue_size=10)
 		self.rate_publisher.publish(self.pub_rate)
+		self.gripper.close()
+		self.gripper.open()
 
+	def grip_ball(self):
+		self.gripper.close()
 
 def run(camera):
-
+	
 	# Creating a window for later use
 	cv.namedWindow('result')
 	tl = tf.TransformListener()
@@ -83,8 +89,10 @@ def run(camera):
 		# lower_hsv = np.array([0, 0, 0])
 		# upper_hsv = np.array([179, 255, 255])
 
-		lower_hsv_orng = np.array([1,50,245])
-		upper_hsv_orng = np.array([20,219,255])
+		#lower_hsv_orng = np.array([1,50,245])
+		#upper_hsv_orng = np.array([20,219,255])
+		lower_hsv_orng = np.array([0,136,26])
+		upper_hsv_orng = np.array([5,219,195])
 		mask_orng = cv.inRange(hsv,lower_hsv_orng, upper_hsv_orng)
 
 		lower_hsv_pink1 = np.array([160,14,10])
@@ -102,7 +110,7 @@ def run(camera):
 		#pink_x, pink_y, mask2, current_area = vl.track_object(mask_pink)
 
 		display = frame.copy()
-		cv.circle(display, (320, 200), 10, 255, -1) 
+		cv.circle(display, (320, 70), 10, 255, -1) 
 		cv.circle(display, (orng_x, orng_y), 10, (0,0,255), -1) 
 		#cv.circle(display, (pink_x, pink_y), 10, (0,255,0), -1) 
 
@@ -111,8 +119,12 @@ def run(camera):
 		cv.imshow('result', display)
 
 		#visual_servo(tl, camera, pink_x, pink_y, current_area)
-		visual_servo(tl, camera, orng_x, orng_y, current_area)
+		ball_gripped = visual_servo(tl, camera, orng_x, orng_y, current_area)
 		# rate.sleep()
+
+		if ball_gripped:
+			print 'THROW'
+			break
 
 		k = cv.waitKey(5) & 0xFF
 		if k == 27:
@@ -153,15 +165,24 @@ def visual_servo(tl, camera, u, v, current_area):
 	#	xi = camera.calc_end_velocities(u, v, Z=1)
 	# No object is being tracked
 	if u == -1 or v == -1:
-		motion_controller.command_velocity(np.zeros(6))
-		return
+		#motion_controller.command_velocity(np.zeros(6))
+		#return
+		xi = np.zeros(2)
+		desired_depth_vel = 0.02
+	else:
+		xi = camera.calc_desired_feat_velocities(u, v, XY_K0)
+		desired_depth_vel = camera.calc_desired_depth_velocity(DEPTH_K0, current_area)
+		if desired_depth_vel > 0:
+			baxter.grip_ball()	
+			motion_controller.command_velocity(np.zeros(6))
+			return True
+		
+	
 
-	xi = camera.calc_desired_feat_velocities(u, v)
-	desired_depth_vel = camera.calc_desired_depth_velocity(DEPTH_K0, current_area)
 	print 'Desired depth vel:', desired_depth_vel
 	#xi = -np.append(xi, np.array([0]))
 	xi = -np.append(xi, desired_depth_vel)
-	#print xi
+	print xi
 
 	vect = Vector3Stamped()
 	vect.header.frame_id = '/right_hand_camera'
@@ -178,6 +199,8 @@ def visual_servo(tl, camera, u, v, current_area):
 
 	except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
 		print "you suck"
+	
+	return False
 
 
 if __name__=="__main__":

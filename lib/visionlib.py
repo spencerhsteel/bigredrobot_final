@@ -66,7 +66,8 @@ class BaxterCamera:
 
     def calc_desired_feat_velocities(self, u, v, k0=0.001):
         # velocity point toward image center from current feature point
-        center = np.array([self.FRAME_WIDTH/2, self.FRAME_HEIGHT/2])
+        #center = np.array([self.FRAME_WIDTH/2, self.FRAME_HEIGHT/2])
+        center = np.array([self.FRAME_WIDTH/2, 70])
         current = np.array([u, v])
         velocity = k0*(center-current)
         # print 'center:', center
@@ -77,7 +78,8 @@ class BaxterCamera:
     def calc_desired_depth_velocity(self, k0, current_pixel_area):
         # Temporarily try and get the ball to be half of the frame width
         # This will need to be replaced with a real number later on.
-    	desired_pixel_area = self.FRAME_WIDTH/5*self.FRAME_HEIGHT/5
+    	#desired_pixel_area = self.FRAME_WIDTH/3*self.FRAME_HEIGHT/3
+        desired_pixel_area = 22000
         velocity = k0*(current_pixel_area - desired_pixel_area)/1000
         # negative so that Baxter moves down towards the ball
         return np.array([velocity])
@@ -111,7 +113,7 @@ class OverheadCamera:
 
     def depth_callback(self,data):
        try:
-         depth_image = self.bridge.imgmsg_to_cv2(data, "16UC1")
+         depth_image = self.bridge.imgmsg_to_cv2(data, "mono8")
        except CvBridgeError, e:
          print e
        self.depthframe = depth_image

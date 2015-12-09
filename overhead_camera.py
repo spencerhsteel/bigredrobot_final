@@ -2,9 +2,10 @@ import cv2 as cv
 import visionlib as vl
 import numpy as np
 import rospy
+from std_msgs.msg import String
 
 USE_TRACKBARS = False
-USE_DEPTHMASK = False
+USE_DEPTHMASK = True
 FIND_ROI = False
 
 def run(camera):
@@ -24,8 +25,8 @@ def run(camera):
                     break
             cx = int(box[0][0])
             cy = int(box[0][1])
-            h = int(box[1][0]) 
-            w = int(box[1][1])
+            w =  int(box[1][1])
+            h =  int(box[1][0])
             x = cx - w/2
             y = cy - h/2
             print cx,cy,x,y,w,h
@@ -68,22 +69,27 @@ def run(camera):
 
         #_, self.frame = self.capture.read()
         rgb = camera.get_frame()
-        #depth = camera.get_depth_frame()
-        #z_data = depth          
-        #create table mask
-        if USE_DEPTHMASK:
-            for v in range(0,640):
-                for u in range(0,480):
-                    if z_data[u][v] > 2000 or z_data[u][v] < 1500:
-                        rgb[u][v] = (0,0,0)
-        
+        depth = camera.get_depth_frame()
+        print depth
 
-        frame = cv.blur(rgb, (3,3))        
-        #if FIND_ROI:
-        copy = frame.copy()        
+        frame = cv.blur(rgb, (3,3))  
+        #create table mask      
+        #if FIND_ROI:        
+        copy = frame.copy()          
         mask = np.zeros(copy.shape[:2],np.uint8)
         mask[y:y+h,x:x+w] = 255
         frame = cv.bitwise_and(copy,copy,mask = mask)
+
+		#create table mask
+        if USE_DEPTHMASK:
+            _, depth_thresh = cv.threshold(depth, 127, 255, cv.THRESH_BINARY)
+            cv.imshow('test',depth_thresh)
+            #mask = np.ones(copy.shape[:2],np.uint8)
+            #for v in range(x,x+w):
+            #    for u in range(y,y+h):
+            #        if z_data[u][v] > 2000 or z_data[u][v] < 1500:
+            #            mask[u,v] = 0
+            #frame = cv.bitwise_and(copy,copy,mask = depth_thresh)
 
         #converting to HSV
         hsv = cv.cvtColor(frame,cv.COLOR_BGR2HSV)
@@ -107,12 +113,12 @@ def run(camera):
             cv.imshow('Thresh trackbar',mask3)
 
         gray = cv.cvtColor(display,cv.COLOR_BGR2GRAY)
-        circles = cv.HoughCircles(gray,cv.cv.CV_HOUGH_GRADIENT,2,20,
-                                    param1=100,param2=35,minRadius=5,maxRadius=15)
-        circles = np.uint16(np.around(circles))
-        for i in circles[0,:]:
+        #circles = cv.HoughCircles(gray,cv.cv.CV_HOUGH_GRADIENT,2,20,
+        #                            param1=100,param2=35,minRadius=5,maxRadius=15)
+        #circles = np.uint16(np.around(circles))
+        #for i in circles[0,:]:
             # draw the outer circle
-            cv.circle(display,(i[0],i[1]),i[2],(0,255,0),2)
+        #    cv.circle(display,(i[0],i[1]),i[2],(0,255,0),2)
 
 
         lower_hsv_pink = np.array([140, 79, 78])
@@ -136,7 +142,9 @@ def run(camera):
         else:
             side =  'left'
 
-        print side
+        #publish
+        pub.publish(side)
+        rate.sleep()
 
         k = cv.waitKey(5) & 0xFF
         if k == 27:
@@ -197,6 +205,9 @@ def track_object_local(mask, locations):
     return tracked_x, tracked_y, morphed_mask, area
 
 if __name__=="__main__":
+    pub = rospy.Publisher('overhead_camera', String, queue_size = 10)
     rospy.init_node('overhead_camera', anonymous=True)
+		
     camera = vl.OverheadCamera()
     run(camera)
+
