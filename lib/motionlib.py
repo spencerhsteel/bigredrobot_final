@@ -30,11 +30,16 @@ class BaxterMotionController:
 
     def __init__(self, baxter, arm):
 
-        self._arm = baxter.arm
-        self._joint_names = self._arm.joint_names()
+        self.arm = arm # arm string
+        self._arm_obj = baxter.arm # arm object
+        self._joint_names = self._arm_obj.joint_names()
         self._kin = baxter_kinematics(arm)
 
-        self.lower_limits, self.upper_limits = hf.get_limits()
+        self.lower_limits, self.upper_limits = hf.get_limits(self.arm)
+        print self.lower_limits
+        print self.upper_limits
+        print {joint:(self.lower_limits[joint] + self.upper_limits[joint])/2 for joint in self.lower_limits}
+        print  self._arm_obj.joint_angles()
 
          # set joint state publishing to 500Hz
         self.pub_rate = 500.0  # Hz
@@ -54,7 +59,7 @@ class BaxterMotionController:
         for _ in xrange(100):
             if rospy.is_shutdown():
                 return False
-            self._arm.exit_control_mode()
+            self._arm_obj.exit_control_mode()
             self.rate_publisher.publish(100)  # 100Hz default joint state rate
             rate.sleep()
         return True
@@ -64,7 +69,7 @@ class BaxterMotionController:
         Sets both arms back into a neutral pose.
         '''
         rospy.loginfo("Moving to neutral pose...")
-        self._arm.move_to_neutral()
+        self._arm_obj.move_to_neutral()
 
     def clean_shutdown(self):
         rospy.loginfo("\nCrashing stuff...")
@@ -76,7 +81,7 @@ class BaxterMotionController:
     ########################################
 
     def get_gripper_coords(self):
-        pos = self._arm.endpoint_pose().popitem()[1]
+        pos = self._arm_obj.endpoint_pose().popitem()[1]
         return np.matrix([pos.x, pos.y, pos.z]).T
 
     def dist_from_point(self, p):
@@ -101,61 +106,40 @@ class BaxterMotionController:
         Jinv = hf.rpinv(J)
         q_dot = Jinv*squiggle + (np.identity(7) - (Jinv*J))*self.get_b(self.K0) 
         cmd = {joint: q_dot[i, 0] for i, joint in enumerate(self._joint_names)}
-        self._arm.set_joint_velocities(cmd)
+        self._arm_obj.set_joint_velocities(cmd)
 
     def get_b(self, k):
         '''
         Secondary objective function, designed to avoid joint limits
+        https://books.google.com/books?id=nyrY0Pu5kl0C&pg=PA128&dq=jacobian+secondary+objective+function&hl=en&sa=X&ved=0ahUKEwiqscikhM_JAhVljIMKHZZ7CYQQ6AEIHDAA#v=onepage&q=jacobian%20secondary%20objective%20function&f=false
         '''
-        joint_angles = self._arm.joint_angles()
-        # This is other stuff (thanks Google!)
-        return k * self.get_z_joint_limits(joint_angles, self.lower_limits, self.upper_limits)
-        # This is from class
-        # return k * self.get_partial_w_q_joint_limits(joint_angles,delta)
+        joint_angles = self._arm_obj.joint_angles()
 
-    def get_z_joint_limits(self, joint_angles, lower_limits, upper_limits):
-        '''
-        upper_limits and lower_limits are dicts, so is joint_angles
-        '''
-        n = len(hf.frame_dict)
-        z = []
-        for joint in hf.frame_dict:
-            q_bar = (lower_limits[joint] + upper_limits[joint])/2
-            z.append((joint_angles[joint] - q_bar)/(upper_limits[joint] - lower_limits[joint])**2)
-        return np.matrix(z).T
-  
-    """
-    def get_w_joint_limits(self, joint_angles, lower_limits, upper_limits):
-        '''
-        Not working
-        upper_limits and lower_limits are dicts, so is joint_angles
-        '''
-        n = len(hf.frame_dict)
-        w = 0
-        for joint in hf.frame_dict:
-            q_bar = (lower_limits[joint] + upper_limits[joint])/2
-            #NOTE: Changed from w - ... to w + ... : might be wrong
-            w = w + ((joint_angles[joint] - q_bar)/(upper_limits[joint] - lower_limits[joint]))**2
-        return w
+        q = []
+        q_bar = []
+        delta_q = []
 
-    def get_partial_w_q_joint_limits(self, joint_angles, delta):
-        '''
-        For the secondary objective function, get the partial of w wrt q
-        '''
-        # All inputs are dicts
-        n = len(joint_angles)
-        partial = []
+
+        delta_q = []
+        for joint in hf.get_frame_dict(self.arm):
+            q.append(joint_angles[joint])
+            q_bar.append((self.lower_limits[joint] + self.upper_limits[joint])/2)
+            delta_q.append(self.upper_limits[joint] - self.lower_limits[joint])
+            
+            
+        q = np.array(q)
+        q_bar = np.array(q_bar)
+        delta_q = np.array(delta_q) 
         
-        for joint in hf.frame_dict:
-            delta_angles = joint_angles.copy()
-            delta_angles[joint] = delta_angles[joint] + delta
-            fq = self.get_w_joint_limits(joint_angles, self.lower_limits, self.upper_limits)
-            fqdelta = self.get_w_joint_limits(delta_angles, self.lower_limits, self.upper_limits)
-            partial.append( (fqdelta - fq) / delta) 
-        return np.matrix(partial).T # np array in framedict order
+        z = np.abs(q_bar - q)/np.square(delta_q)
+        
+        print 'qb:', q_bar    
+        print 'z:', z
+        print 'q', q
+        print '\n'
+        
+        return -k * np.matrix(z).T
 
-    """
-     
     ########################################
     # Line and spline following functions
     ########################################

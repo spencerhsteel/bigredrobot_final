@@ -1,6 +1,6 @@
 import cv2 as cv
-import visionlib as vl
-import motionlib as ml
+import lib.visionlib as vl
+import lib.motionlib as ml
 import rospy
 import numpy as np
 
