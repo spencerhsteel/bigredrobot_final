@@ -25,7 +25,7 @@ class BaxterMotionController:
 
     KP = 0.8                # Line following proportional gain
     MOVE_SPEED = 0.07       # Velocity used when following the line
-    K0 = 10                # Gain for the secondary objective function
+    K0 = 0                # Gain for the secondary objective function
 
 
     def __init__(self, baxter, arm):
@@ -133,10 +133,10 @@ class BaxterMotionController:
         
         z = (q_bar - q)/np.square(delta_q)
         
-        print 'qb:', q_bar    
-        print 'z:', z
-        print 'q', q
-        print '\n'
+        #print 'qb:', q_bar    
+        #print 'z:', z
+        #print 'q', q
+        #print '\n'
         
         return -k * np.matrix(z).T
 

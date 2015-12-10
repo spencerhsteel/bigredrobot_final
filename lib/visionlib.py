@@ -9,6 +9,10 @@ import helper_functions as hf
 import baxter_interface
 from baxter_interface import CHECK_VERSION
 
+
+UPPER_PINK1 = [179,220,245]
+LOWER_PINK1 = [160,40,10]
+
 # http://www.pages.drexel.edu/~nk752/Visual_Servoing_Article_Part_1.pdf
 class BaxterCamera:
     def __init__(self, arm='right'):
@@ -79,7 +83,7 @@ class BaxterCamera:
         # Temporarily try and get the ball to be half of the frame width
         # This will need to be replaced with a real number later on.
     	#desired_pixel_area = self.FRAME_WIDTH/3*self.FRAME_HEIGHT/3
-        desired_pixel_area = 22000
+        desired_pixel_area = 23000
         velocity = k0*(current_pixel_area - desired_pixel_area)/1000
         # negative so that Baxter moves down towards the ball
         return np.array([velocity])
@@ -152,6 +156,31 @@ def track_object(mask):
       x = int(moment['m10']/area)
       y = int(moment['m01']/area) 
     return x, y, morphed_mask, area
+    
+def locate_orange_ball(frame):
+    # returns: orng_x, orng_y, mask1, current_area
+    frame = cv.blur(frame, (3,3))
+    lower_hsv_orng = np.array([0,136,15])
+    upper_hsv_orng = np.array([5,219,240])
+    mask_orng = cv.inRange(frame,lower_hsv_orng, upper_hsv_orng)
+            
+    return track_object(mask_orng)
+    
+def locate_pink_ball(frame):
+    # returns: pink_x, pink_y, mask2, current_area
+    frame = cv.blur(frame, (3,3))
+    lower_hsv_pink1 = np.array(LOWER_PINK1)
+    upper_hsv_pink1 = np.array(UPPER_PINK1)
+    mask_pink1 = cv.inRange(frame,lower_hsv_pink1, upper_hsv_pink1)
+    
+    lower_hsv_pink2 = np.array([0, 40, 10])
+    upper_hsv_pink2 = np.array([8, 220, 245])
+    mask_pink2 = cv.inRange(frame, lower_hsv_pink2, upper_hsv_pink2)
+    
+    mask_pink = cv.bitwise_or(mask_pink1, mask_pink2)
+    
+    return track_object(mask_pink)
+    
 
 if __name__=="__main__":
     v = BaxterCamera()
