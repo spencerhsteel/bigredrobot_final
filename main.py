@@ -51,11 +51,14 @@ class Planner:
     DEFENSE_MODE = 0
     OFFENSE_MODE = 1
     
-    DEFENSE_POS = {'right_s0': -0.2676796471801758, 'right_s1': -0.23584954586791992, 'right_w0': 0.20095148298339846, 'right_w1': 1.377898241143799, 'right_w2': 0.6523253293029786, 'right_e0': 0.43334957208251956, 'right_e1': 1.0484758673217773}
+    ATTACK_POS = {'right_s0': -0.1729563336364746, 'right_s1': -0.9407137170959473, 'right_w0': -0.2538738201049805, 'right_w1': 0.783480686517334, 'right_w2': -2.023704152105713, 'right_e0': 0.411490345880127, 'right_e1': 1.7353157643127441}
+    
+    DEFENSE_POS = {'right_s0': -0.7378447581298828, 'right_s1': 0.2573252768737793, 'right_w0': -1.9105730691284182, 'right_w1': 1.2954467738891602, 'right_w2': -1.3115535721435547, 'right_e0': 1.3337962935424805, 'right_e1': 1.6463448787170412}
 
     
     def __init__(self, camera, motion_controller):
         self.camera = camera
+        #self.overhead_camera = overhead_camera
         self.motion_controller = motion_controller
         self.current_mode = Planner.DEFENSE_MODE
         self.tl = tf.TransformListener()
@@ -65,25 +68,47 @@ class Planner:
         cv.namedWindow('mask')
         
         arm = self.motion_controller._arm_obj
-        arm.set_joint_positions(Planner.DEFENSE_POS) # run this when first entering defenCe mode
+        
+        self.enter_defense_mode(arm)
         
         while not rospy.is_shutdown():
             self.frame = camera.get_frame()
+            #self.overhead_frame = overhead_camera.get_frame()
             cv.imshow(window_name, self.frame)
             if self.current_mode == Planner.DEFENSE_MODE:
                 self.defend()
+                #pass
             else:
                 self.attack(camera)
             cv.waitKey(5)
     
     def defend(self):
+        raw_input('Press Enter to see joint angles...')
+        print self.motion_controller._arm_obj.joint_angles()
+        #self.defense_visual_servo()
 
-        #raw_input('Press Enter to see joint angles...')
-        #print self.motion_controller._arm_obj.joint_angles()
-        self.defense_visual_servo()
+    def enter_defense_mode(self, arm):
+        print 'Entering Defense Mode'
+        arm.move_to_joint_positions(Planner.DEFENSE_POS)
+        #arm.set_joint_positions(Planner.DEFENSE_POS) # run this when first entering defenCe mode
 
-        
     def defense_visual_servo(self):
+        u, v, mask2, current_area = vl.locate_pink_ball(self.overhead_frame)
+        cv.imshow('mask', mask2)
+        
+        # No object is being tracked
+        if u == -1 or v == -1:
+            xi = np.zeros(2) # xy vel to zero
+        else:
+            print 'object found:', u, v
+            xi = camera.calc_desired_feat_velocities(u, v, XY_K0)
+            xi[1] = 0.0 # don't move in camera y
+            
+        xi = -np.append(xi, desired_depth_vel)
+        print xi
+        
+    '''
+    def defense_visual_servo_old(self):
         u, v, mask2, current_area = vl.locate_pink_ball(self.frame)
         #u, v, mask2, current_area = vl.locate_orange_ball(self.frame)
         desired_depth_vel = 0
@@ -116,7 +141,7 @@ class Planner:
             print "you suck"
         
         return False
-            
+    '''         
 
 
 

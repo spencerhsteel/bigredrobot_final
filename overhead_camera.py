@@ -1,5 +1,5 @@
 import cv2 as cv
-import visionlib as vl
+import lib.visionlib as vl
 import numpy as np
 import rospy
 from std_msgs.msg import String
@@ -75,21 +75,22 @@ def run(camera):
         frame = cv.blur(rgb, (3,3))  
         #create table mask      
         #if FIND_ROI:        
-        copy = frame.copy()          
-        mask = np.zeros(copy.shape[:2],np.uint8)
+        #copy = frame.copy()          
+        mask = np.zeros(frame.shape[:2],np.uint8)
         mask[y:y+h,x:x+w] = 255
-        frame = cv.bitwise_and(copy,copy,mask = mask)
+        frame = cv.bitwise_and(frame,frame,mask = mask)
 
 		#create table mask
         if USE_DEPTHMASK:
+            cv.convert_to(
             _, depth_thresh = cv.threshold(depth, 127, 255, cv.THRESH_BINARY)
             cv.imshow('test',depth_thresh)
-            #mask = np.ones(copy.shape[:2],np.uint8)
+            #mask = np.ones(frame.shape[:2],np.uint8)
             #for v in range(x,x+w):
             #    for u in range(y,y+h):
             #        if z_data[u][v] > 2000 or z_data[u][v] < 1500:
             #            mask[u,v] = 0
-            #frame = cv.bitwise_and(copy,copy,mask = depth_thresh)
+            #frame = cv.bitwise_and(frame,frame,mask = depth_thresh)
 
         #converting to HSV
         hsv = cv.cvtColor(frame,cv.COLOR_BGR2HSV)
