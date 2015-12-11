@@ -27,11 +27,16 @@ class BaxterMotionController:
     MOVE_SPEED = 0.07       # Velocity used when following the line
     K0 = 0                # Gain for the secondary objective function
 
+	RIGHT_THROW_START_ANGLES = 
+	LEFT_THROW_START_ANGLES = 
+
 
     def __init__(self, baxter, arm):
 
         self.arm = arm # arm string
         self._arm_obj = baxter.arm # arm object
+		self._gripper_obj = baxter.gripper
+
         self._joint_names = self._arm_obj.joint_names()
         self._kin = baxter_kinematics(arm)
 
@@ -186,6 +191,35 @@ class BaxterMotionController:
             self.command_velocity(squiggle)
             rate.sleep()
         rospy.loginfo("Done moving this line")
-        self.command_velocity(np.matrix([0,0,0,0,0,0]).T);        
+        
+        # Commented this out because its no good for throwing
+        #self.command_velocity(np.matrix([0,0,0,0,0,0]).T);   
+
+    ########################################
+    # Throwing functions
+    ########################################
+    def throw(self, throw_vel=0.1, throw_dist=0.3):
+        if self.arm == 'right':
+            start_angles = RIGHT_THROW_START_ANGLES
+        else:
+            start_angles = LEFT_THROW_START_ANGLES
+            throw_dist = -throw_dist # throw in the opposite direction
+
+        # move to throw start position
+        self.arm.move_to_joint_positions(start_angles)
+
+        p_0 = self.get_gripper_coords() # as [x, y, z].T matrix
+        delta_p_throw = np.matrix([0, -throw_dist, 0]
+        p_1 = p_0 + delta_p_throw
+        p_2 = p_1 + delta_p_throw/2 # move half as far again after release
+
+        self.follow_line_p_control(p0,p1,throw_vel,self.KP)
+        self._gripper_obj.open() # bring the pain
+        
+        # move to throw start position
+        self.arm.move_to_joint_positions(start_angles)
+        
+        
+		   	
       
 
