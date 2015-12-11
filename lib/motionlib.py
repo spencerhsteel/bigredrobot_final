@@ -27,7 +27,7 @@ class BaxterMotionController:
     MOVE_SPEED = 0.07       # Velocity used when following the line
     K0 = 0                # Gain for the secondary objective function
 
-	RIGHT_THROW_START_ANGLES = 
+	RIGHT_THROW_START_ANGLES = {'right_s0': -0.1729563336364746, 'right_s1': -0.9407137170959473, 'right_w0': -0.2538738201049805, 'right_w1': 0.783480686517334, 'right_w2': -2.023704152105713, 'right_e0': 0.411490345880127, 'right_e1': 1.7353157643127441}
 	LEFT_THROW_START_ANGLES = 
 
 
@@ -209,7 +209,7 @@ class BaxterMotionController:
         self.arm.move_to_joint_positions(start_angles)
 
         p_0 = self.get_gripper_coords() # as [x, y, z].T matrix
-        delta_p_throw = np.matrix([0, -throw_dist, 0]
+        delta_p_throw = np.matrix([0, -throw_dist, 0] # throw along the negative y for the right arm
         p_1 = p_0 + delta_p_throw
         p_2 = p_1 + delta_p_throw/2 # move half as far again after release
 
