@@ -83,7 +83,7 @@ class BaxterCamera:
         # Temporarily try and get the ball to be half of the frame width
         # This will need to be replaced with a real number later on.
     	#desired_pixel_area = self.FRAME_WIDTH/3*self.FRAME_HEIGHT/3
-        desired_pixel_area = 23000
+        desired_pixel_area = 22000
         velocity = k0*(current_pixel_area - desired_pixel_area)/1000
         # negative so that Baxter moves down towards the ball
         return np.array([velocity])
@@ -159,9 +159,9 @@ def track_object(mask):
     
 def locate_orange_ball(frame):
     # returns: orng_x, orng_y, mask1, current_area
-    frame = cv.blur(frame, (3,3))
-    lower_hsv_orng = np.array([0,136,15])
-    upper_hsv_orng = np.array([5,219,240])
+    #frame = cv.blur(frame, (3,3))
+    lower_hsv_orng = np.array([0,145,57])
+    upper_hsv_orng = np.array([15,237,255])
     mask_orng = cv.inRange(frame,lower_hsv_orng, upper_hsv_orng)
             
     return track_object(mask_orng)

@@ -49,7 +49,7 @@ class Baxter:
         
 class Planner:
     DEFENSE_MODE = 0
-    OFFENSE_MODE = 1
+    ATTACK_MODE = 1
     
     ATTACK_POS = {'right_s0': -0.1729563336364746, 'right_s1': -0.9407137170959473, 'right_w0': -0.2538738201049805, 'right_w1': 0.783480686517334, 'right_w2': -2.023704152105713, 'right_e0': 0.411490345880127, 'right_e1': 1.7353157643127441}
     
@@ -63,54 +63,85 @@ class Planner:
         self.current_mode = Planner.DEFENSE_MODE
         self.tl = tf.TransformListener()
         
-        window_name = 'Wrist Camera'
-        cv.namedWindow(window_name)
-        cv.namedWindow('mask')
-        
+
+    def run(self):
         arm = self.motion_controller._arm_obj
         
-        self.enter_defense_mode(arm)
+        window_name = 'Wrist Camera'
+        cv.namedWindow(window_name)
         
+        #self.enter_defense_mode(arm)
+        self.enter_attack_mode(arm)
+        print 'Press <esc> to toggle modes'
         while not rospy.is_shutdown():
-            self.frame = camera.get_frame()
+            self.raw = cv.blur(camera.get_frame(), (3,3)) 
+            cv.imshow(window_name, self.raw)
+            self.frame = cv.cvtColor(self.raw,cv.COLOR_BGR2HSV)
             #self.overhead_frame = overhead_camera.get_frame()
-            cv.imshow(window_name, self.frame)
+            k = cv.waitKey(5)
             if self.current_mode == Planner.DEFENSE_MODE:
                 self.defend()
-                #pass
+                if k == 27:
+                    self.enter_attack_mode(arm)
             else:
                 self.attack(camera)
-            cv.waitKey(5)
+                if k == 27:
+                    self.enter_defense_mode(arm)                
     
     def defend(self):
-        raw_input('Press Enter to see joint angles...')
-        print self.motion_controller._arm_obj.joint_angles()
+        pass
+        #raw_input('Press Enter to see joint angles...')
+        #print self.motion_controller._arm_obj.joint_angles()
         #self.defense_visual_servo()
+
+    def enter_attack_mode(self, arm):
+        print 'Entering Attack Mode'
+        self.current_mode = Planner.ATTACK_MODE
+        arm.move_to_joint_positions(Planner.ATTACK_POS)
 
     def enter_defense_mode(self, arm):
         print 'Entering Defense Mode'
+        self.current_mode = Planner.DEFENSE_MODE
         arm.move_to_joint_positions(Planner.DEFENSE_POS)
-        #arm.set_joint_positions(Planner.DEFENSE_POS) # run this when first entering defenCe mode
 
-    def defense_visual_servo(self):
-        u, v, mask2, current_area = vl.locate_pink_ball(self.overhead_frame)
-        cv.imshow('mask', mask2)
-        
+
+    def attack_visual_servo(self):
+        #u, v, mask2, current_area = vl.locate_pink_ball(self.frame)
+        u, v, mask2, current_area = vl.locate_orange_ball(self.frame)
+        print current_area
+        cv.imshow('MASK',mask2)
         # No object is being tracked
         if u == -1 or v == -1:
             xi = np.zeros(2) # xy vel to zero
+            desired_depth_vel = 0.0
         else:
-            print 'object found:', u, v
             xi = camera.calc_desired_feat_velocities(u, v, XY_K0)
-            xi[1] = 0.0 # don't move in camera y
-            
+            desired_depth_vel = camera.calc_desired_depth_velocity(DEPTH_K0, current_area)
+        if desired_depth_vel > 0:
+            baxter.grip_ball()
+            print "I found the ball!"
+            motion_controller.command_velocity(np.zeros(6))
+            return True
+        #print 'Desired depth vel:', desired_depth_vel
         xi = -np.append(xi, desired_depth_vel)
-        print xi
+        #print xi
+        vect = Vector3Stamped()
+        vect.header.frame_id = '/right_hand_camera'
+        vect.header.stamp = rospy.Time(0)
+        vect.vector = Vector3(*xi[0:3])
+        try:
+            trans_vect = self.tl.transformVector3('/base', vect)
+            squiggle = np.array([trans_vect.vector.x,trans_vect.vector.y,trans_vect.vector.z,0,0,0])
+            #print squiggle
+            motion_controller.command_velocity(squiggle)
+        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            print "you suck"
         
-    '''
-    def defense_visual_servo_old(self):
-        u, v, mask2, current_area = vl.locate_pink_ball(self.frame)
-        #u, v, mask2, current_area = vl.locate_orange_ball(self.frame)
+        return False
+
+    def defense_visual_servo(self):
+        #u, v, mask2, current_area = vl.locate_pink_ball(self.frame)
+        u, v, mask2, current_area = vl.locate_orange_ball(self.frame)
         desired_depth_vel = 0
         
         cv.imshow('mask',mask2)
@@ -124,7 +155,6 @@ class Planner:
             xi[1] = 0.0 # don't move in camera y
             
         xi = -np.append(xi, desired_depth_vel)
-        print xi
 
         vect = Vector3Stamped()
         vect.header.frame_id = '/right_hand_camera'
@@ -134,45 +164,21 @@ class Planner:
         try:
             trans_vect = self.tl.transformVector3('/base', vect)
             squiggle = np.array([trans_vect.vector.x,trans_vect.vector.y,trans_vect.vector.z,0,0,0])
-            print squiggle
             motion_controller.command_velocity(squiggle)
 
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             print "you suck"
         
         return False
-    '''         
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+       
 
     def attack(self, camera):
-        self.get_ball(camera)
+        if self.get_ball(camera):
+            self.motion_controller.throw()
         
     #TODO: Clean up this huge function
     def get_ball(self, camera):
-        tl = tf.TransformListener()
-
+       
         # Creating track bar
         if USE_TRACKBARS:
             callback = lambda x: 0
@@ -183,93 +189,101 @@ class Planner:
             cv.createTrackbar('vmin', 'result',0,255, callback)
             cv.createTrackbar('vmax', 'result',255,255, callback)
         rate = rospy.Rate(10)
-        while not rospy.is_shutdown():
-
-            #_, self.frame = self.capture.read()
-            frame = cv.blur(camera.get_frame(), (3,3))
-
-            #converting to HSV
-            hsv = cv.cvtColor(frame,cv.COLOR_BGR2HSV)
-
-            # get info from track bar and appy to result
-            if USE_TRACKBARS:
-                hmin = cv.getTrackbarPos('hmin','result')
-                hmax = cv.getTrackbarPos('hmax','result')
-                smin = cv.getTrackbarPos('smin','result')
-                smax = cv.getTrackbarPos('smax','result')
-                vmin = cv.getTrackbarPos('vmin','result')
-                vmax = cv.getTrackbarPos('vmax','result')
-                lower_hsv = np.array([hmin, smin, vmin])
-                upper_hsv = np.array([hmax, smax, vmax])
-                mask_trackbar = cv.inRange(hsv,lower_hsv, upper_hsv)
-                track_x, track_y, mask3, _ = vl.track_object(mask_trackbar)
-                cv.imshow('Thresh trackbar',mask3)
-
-
-            orng_x, orng_y, mask1, current_area = vl.locate_orange_ball()
-            pink_x, pink_y, mask2, current_area = vl.locate_pink_ball()
-
-
-            display = frame.copy()
-            cv.circle(display, (320, 70), 10, 255, -1) 
-            cv.circle(display, (orng_x, orng_y), 10, (0,0,255), -1) 
-            #cv.circle(display, (pink_x, pink_y), 10, (0,255,0), -1) 
-
-            cv.imshow('Thresh orange',mask1)
-            #cv.imshow('Thresh pink',mask2)
-            #cv.imshow('result', display)
-            
-            #ball_gripped = visual_servo(tl, camera, pink_x, pink_y, current_area)
-            ball_gripped = visual_servo(tl, camera, orng_x, orng_y, current_area)
-            # rate.sleep()
-            
-            if ball_gripped:
-                print 'THROW'
-                break
-
-            k = cv.waitKey(5) & 0xFF
-            if k == 27:
-                break
         
-        cv.destroyAllWindows()
+        #_, self.frame = self.capture.read()
+        frame = cv.blur(camera.get_frame(), (3,3))
 
-    # NOTE: tl is transform listener
-    def visual_servo(self, tl, camera, u, v, current_area):    
+        #converting to HSV
+        hsv = cv.cvtColor(frame,cv.COLOR_BGR2HSV)
+
+        # get info from track bar and appy to result
+        if USE_TRACKBARS:
+            hmin = cv.getTrackbarPos('hmin','result')
+            hmax = cv.getTrackbarPos('hmax','result')
+            smin = cv.getTrackbarPos('smin','result')
+            smax = cv.getTrackbarPos('smax','result')
+            vmin = cv.getTrackbarPos('vmin','result')
+            vmax = cv.getTrackbarPos('vmax','result')
+            lower_hsv = np.array([hmin, smin, vmin])
+            upper_hsv = np.array([hmax, smax, vmax])
+            mask_trackbar = cv.inRange(hsv,lower_hsv, upper_hsv)
+            track_x, track_y, mask3, _ = vl.track_object(mask_trackbar)
+            cv.imshow('Thresh trackbar',mask3)
+
+        orng_x, orng_y, mask1, current_area = vl.locate_orange_ball(frame)
+        #pink_x, pink_y, mask2, current_area = vl.locate_pink_ball(frame)
+
+        display = frame.copy()
+        cv.circle(display, (320, 70), 10, 255, -1) 
+        cv.circle(display, (orng_x, orng_y), 10, (0,0,255), -1) 
+        #cv.circle(display, (pink_x, pink_y), 10, (0,255,0), -1) 
+
+        #cv.imshow('Thresh orange',mask1)
+        #cv.imshow('Thresh pink',mask2)
+        #cv.imshow('result', display)
         
-        # No object is being tracked
-        if u == -1 or v == -1:
-            xi = np.zeros(2) # xy vel to zero
-            desired_depth_vel = 0.02
+        #ball_gripped = self.visual_servo(self.tl, camera, pink_x, pink_y, current_area)
+        ball_gripped = self.attack_visual_servo()
+        # rate.sleep()
+        
+        if ball_gripped:
+            print 'THROW'
+            return True
         else:
-            xi = camera.calc_desired_feat_velocities(u, v, XY_K0)
-            desired_depth_vel = camera.calc_desired_depth_velocity(DEPTH_K0, current_area)
-            if desired_depth_vel > 0:
-                baxter.grip_ball()   
-                print "I found the ball!" 
-                motion_controller.command_velocity(np.zeros(6))
-                return True
+            return False
+
+        #k = cv.waitKey(5) & 0xFF
+        #if k == 27:
+            #break
         
-        print 'Desired depth vel:', desired_depth_vel
+        #cv.destroyAllWindows()
+def debug_with_trackbars():
+    cv.namedWindow('result')
+    callback = lambda x: 0
+    cv.createTrackbar('hmin', 'result', 0, 179, callback)
+    cv.createTrackbar('hmax', 'result',179,179, callback)
+    cv.createTrackbar('smin', 'result',0,255, callback)
+    cv.createTrackbar('smax', 'result',255,255, callback)
+    cv.createTrackbar('vmin', 'result',0,255, callback)
+    cv.createTrackbar('vmax', 'result',255,255, callback)
+    rate = rospy.Rate(10)
+    
+    while not rospy.is_shutdown():
+        #_, self.frame = self.capture.read()
+        frame = cv.blur(camera.get_frame(), (3,3))
 
-        xi = -np.append(xi, desired_depth_vel)
-        print xi
+        #converting to HSV
+        hsv = cv.cvtColor(frame,cv.COLOR_BGR2HSV)
 
-        vect = Vector3Stamped()
-        vect.header.frame_id = '/right_hand_camera'
-        vect.header.stamp = rospy.Time(0)
-        vect.vector = Vector3(*xi[0:3])
+        # get info from track bar and appy to result
+        hmin = cv.getTrackbarPos('hmin','result')
+        hmax = cv.getTrackbarPos('hmax','result')
+        smin = cv.getTrackbarPos('smin','result')
+        smax = cv.getTrackbarPos('smax','result')
+        vmin = cv.getTrackbarPos('vmin','result')
+        vmax = cv.getTrackbarPos('vmax','result')
+        lower_hsv = np.array([hmin, smin, vmin])
+        upper_hsv = np.array([hmax, smax, vmax])
+        mask_trackbar = cv.inRange(hsv,lower_hsv, upper_hsv)
+        track_x, track_y, mask3, area = vl.track_object(mask_trackbar)
+        print area
+        cv.imshow('Thresh trackbar',mask3)
 
-        try:
-            trans_vect = tl.transformVector3('/base', vect)
-            squiggle = np.array([trans_vect.vector.x,trans_vect.vector.y,trans_vect.vector.z,0,0,0])
-            print squiggle
-            motion_controller.command_velocity(squiggle)
+        display = frame.copy()
+        cv.circle(display, (track_x, track_y), 10, (0,0,255), -1) 
 
-        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            print "you suck"
+        cv.imshow('result', display)
+
+        rate.sleep()
         
-        return False
+       
 
+        k = cv.waitKey(5) & 0xFF
+        if k == 27:
+            break
+        
+    cv.destroyAllWindows()
+    
 
 if __name__=="__main__":
     rospy.init_node('main', anonymous=True)
@@ -278,3 +292,5 @@ if __name__=="__main__":
     #transform_test()
     camera = vl.BaxterCamera(arm='right')
     planner = Planner(camera, motion_controller)
+    #debug_with_trackbars()
+    planner.run()
