@@ -117,7 +117,7 @@ class OverheadCamera:
 
     def depth_callback(self,data):
        try:
-         depth_image = self.bridge.imgmsg_to_cv2(data, "16UC1")
+         depth_image = self.bridge.imgmsg_to_cv2(data, "8UC1")
        except CvBridgeError, e:
          print e
        self.depthframe = depth_image

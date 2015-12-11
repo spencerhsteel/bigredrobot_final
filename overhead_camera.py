@@ -2,7 +2,7 @@ import cv2 as cv
 import lib.visionlib as vl
 import numpy as np
 import rospy
-from std_msgs.msg import String
+from bigredrobot_final.msg import *
 
 USE_TRACKBARS = False
 USE_DEPTHMASK = True
@@ -63,34 +63,26 @@ def run(camera):
         cv.createTrackbar('vmin', 'result',0,255, callback)
         cv.createTrackbar('vmax', 'result',255,255, callback)
     rate = rospy.Rate(10)
-    z_data = None
     side = 'NONE'
     while not rospy.is_shutdown():
 
-        #_, self.frame = self.capture.read()
         rgb = camera.get_frame()
         depth = camera.get_depth_frame()
-        print depth
 
-        frame = cv.blur(rgb, (3,3))  
-        #create table mask      
-        #if FIND_ROI:        
-        #copy = frame.copy()          
+        frame = cv.blur(rgb, (3,3))          
         mask = np.zeros(frame.shape[:2],np.uint8)
         mask[y:y+h,x:x+w] = 255
         frame = cv.bitwise_and(frame,frame,mask = mask)
 
-		#create table mask
+        #create table mask
         if USE_DEPTHMASK:
-            cv.convert_to(
-            _, depth_thresh = cv.threshold(depth, 127, 255, cv.THRESH_BINARY)
-            cv.imshow('test',depth_thresh)
-            #mask = np.ones(frame.shape[:2],np.uint8)
-            #for v in range(x,x+w):
-            #    for u in range(y,y+h):
-            #        if z_data[u][v] > 2000 or z_data[u][v] < 1500:
-            #            mask[u,v] = 0
-            #frame = cv.bitwise_and(frame,frame,mask = depth_thresh)
+            _, depth_thresh = cv.threshold(depth, 5, 255, cv.THRESH_BINARY)
+            d = np.zeros_like(depth_thresh)
+            y_offset = 20
+            d[y_offset:] = depth_thresh[:-y_offset]
+            d = cv.dilate(d, np.ones((15,15)))
+            d = cv.erode(d, np.ones((20,20)))
+            frame = cv.bitwise_and(frame,frame,mask = d)
 
         #converting to HSV
         hsv = cv.cvtColor(frame,cv.COLOR_BGR2HSV)
@@ -114,19 +106,11 @@ def run(camera):
             cv.imshow('Thresh trackbar',mask3)
 
         gray = cv.cvtColor(display,cv.COLOR_BGR2GRAY)
-        #circles = cv.HoughCircles(gray,cv.cv.CV_HOUGH_GRADIENT,2,20,
-        #                            param1=100,param2=35,minRadius=5,maxRadius=15)
-        #circles = np.uint16(np.around(circles))
-        #for i in circles[0,:]:
-            # draw the outer circle
-        #    cv.circle(display,(i[0],i[1]),i[2],(0,255,0),2)
-
 
         lower_hsv_pink = np.array([140, 79, 78])
         upper_hsv_pink = np.array([179, 227, 255])
         mask_pink = cv.inRange(hsv,lower_hsv_pink, upper_hsv_pink)
-        #pink_x, pink_y, mask_pink, _ = track_object_local(mask_pink, circles)
-        pink_x, pink_y, mask_pink, _ = vl.track_object(mask_pink)        
+        pink_x, pink_y, mask_pink, _ = track_ball(mask_pink)        
 
         
         cv.circle(display, (pink_x, pink_y), 5, (0,0,255), -1) 
@@ -143,8 +127,15 @@ def run(camera):
         else:
             side =  'left'
 
-        #publish
-        pub.publish(side)
+        #publish data
+        state = OverheadCamera()
+        state.center_x = cx
+        state.center_y = cy
+        state.width = w
+        state.height = h
+        state.ball_x = pink_x
+        state.ball_y = pink_y
+        pub.publish(state)
         rate.sleep()
 
         k = cv.waitKey(5) & 0xFF
@@ -175,40 +166,33 @@ def find_ROI(frame):
             break
     return fieldCnt, fieldBox
 
-def track_object_local(mask, locations):
-    xy_coords = locations
-    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE,(5,5))
+def track_ball(mask):
+    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE,(10,10))
     morphed_mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
     contours, hierarchy = cv.findContours(morphed_mask.copy(), cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
-    cnts = sorted(contours, key = cv.contourArea, reverse = True)[:10]
     max_area = 0
     best_cnt = None
     area = -1
-    tracked_x = -1
-    tracked_y = -1
-    for cnt in cnts:
-      moment = cv.moments(cnt)
+    for cnt in contours:
+      area = cv.contourArea(cnt)
+      if area > max_area:
+        max_area = area
+        best_cnt = cnt
+
+    if best_cnt is None or max_area<50:
+      x = -1
+      y = -1
+    else:     
+      moment = cv.moments(best_cnt)
       area = moment['m00']
       x = int(moment['m10']/area)
-      y = int(moment['m01']/area)
-      print x,y 
-      for location in locations:
-        lx = location[0][0]
-        ly = location[0][1]
-        print lx,ly
-        if (x < lx+5 and x > lx-5) and (y < ly+5 and y > ly-5):
-            #it is also a circle
-            tracked_x = x
-            tracked_y = y
-            print 'FOUND'
-            break
-
-    return tracked_x, tracked_y, morphed_mask, area
+      y = int(moment['m01']/area) 
+    return x, y, morphed_mask, area
 
 if __name__=="__main__":
-    pub = rospy.Publisher('overhead_camera', String, queue_size = 10)
+    pub = rospy.Publisher('overhead_camera', OverheadCamera, queue_size = 10)
     rospy.init_node('overhead_camera', anonymous=True)
-		
+        
     camera = vl.OverheadCamera()
     run(camera)
 
