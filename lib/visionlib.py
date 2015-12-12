@@ -10,8 +10,8 @@ import baxter_interface
 from baxter_interface import CHECK_VERSION
 
 
-UPPER_PINK1 = [179,220,245]
-LOWER_PINK1 = [160,40,10]
+UPPER_PINK1 = [179,220,255]
+LOWER_PINK1 = [150,36,50]
 
 # http://www.pages.drexel.edu/~nk752/Visual_Servoing_Article_Part_1.pdf
 class BaxterCamera:
@@ -160,8 +160,8 @@ def track_object(mask):
 def locate_orange_ball(frame):
     # returns: orng_x, orng_y, mask1, current_area
     #frame = cv.blur(frame, (3,3))
-    lower_hsv_orng = np.array([0,145,57])
-    upper_hsv_orng = np.array([15,237,255])
+    lower_hsv_orng = np.array([0,0,230])
+    upper_hsv_orng = np.array([15,50,255])
     mask_orng = cv.inRange(frame,lower_hsv_orng, upper_hsv_orng)
             
     return track_object(mask_orng)
@@ -173,8 +173,8 @@ def locate_pink_ball(frame):
     upper_hsv_pink1 = np.array(UPPER_PINK1)
     mask_pink1 = cv.inRange(frame,lower_hsv_pink1, upper_hsv_pink1)
     
-    lower_hsv_pink2 = np.array([0, 40, 10])
-    upper_hsv_pink2 = np.array([8, 220, 245])
+    lower_hsv_pink2 = np.array([0, 0, 230])
+    upper_hsv_pink2 = np.array([15, 50, 255])
     mask_pink2 = cv.inRange(frame, lower_hsv_pink2, upper_hsv_pink2)
     
     mask_pink = cv.bitwise_or(mask_pink1, mask_pink2)

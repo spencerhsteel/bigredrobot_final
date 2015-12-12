@@ -34,7 +34,7 @@ class Baxter:
 
         self.arm = baxter_interface.limb.Limb(arm)
         self.gripper = baxter_interface.Gripper(arm)
-        #self.gripper.calibrate()
+        self.gripper.calibrate()
         self.kinematics = baxter_kinematics(arm)
 
         # control parameters
@@ -48,8 +48,8 @@ class Baxter:
         self.rate_publisher = rospy.Publisher('/robot/joint_state_publish_rate',
                                          UInt16, queue_size=10)
         self.rate_publisher.publish(self.pub_rate)
-        #self.gripper.close()
-        #self.gripper.open()
+        self.gripper.close()
+        self.gripper.open()
 
     def grip_ball(self):
         self.gripper.close()
@@ -92,7 +92,8 @@ class Planner:
         cv.namedWindow(window_name)
         
         ## Check phase
-        phase = self.game.get_current_phase()
+        #phase = self.game.get_current_phase()
+        phase = Game.PHASE_III
         if phase == Game.PHASE_I or phase == Game.NOT_RUNNING:
             # nothing happens (wait for phase 2)
             pass 
@@ -111,7 +112,7 @@ class Planner:
                 
         elif phase == Game.PHASE_III:
             # Stop stacking blocks    
-            stack_pub.publish("stop")
+            #stack_pub.publish("stop")
         
             # Start offense/defence
             #self.enter_defense_mode(arm)
@@ -324,12 +325,11 @@ if __name__=="__main__":
     rospy.init_node('main', anonymous=True)
     game = Game() # start communication with game server (get arm etc.)
     
-    baxter = Baxter(arm='right') # remove for the competition
-    # baxter = Baxter(arm=game.get_arm())  
+    #baxter = Baxter(arm='right') # remove for the competition
+    baxter = Baxter(arm=game.get_arm())  
     motion_controller = ml.BaxterMotionController(baxter, arm='right')
-
     camera = vl.BaxterCamera(arm='right')
-    planner = Planner(game, camera, motion_controller, game)
+    planner = Planner(game, camera, motion_controller)
     debug_with_trackbars()
     #planner.run()
 
