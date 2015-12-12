@@ -1,3 +1,0 @@
-<launch>
-  <include file="$(find collision_checker)/launch/collision_server.launch"/>
-</launch>

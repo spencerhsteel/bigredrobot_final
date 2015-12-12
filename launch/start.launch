@@ -1,8 +1,10 @@
 <launch>
-  <group ns="bigredrobot">
+
+      <node name="joint_state_forwarder" pkg="bigredrobot_final" type="joint_state_forward.py" />
       <node name="main" pkg="bigredrobot_final" type="main.py" />
       <node name="robot_interface" pkg="bigredrobot_final" type="robot_interface.py" />
       <node name="block_stacker" pkg="bigredrobot_final" type="block_stack.py" />
-      <node name="main" pkg="bigredrobot_final" type="overhead_camera.py" />
+      <node name="overhead_camera" pkg="bigredrobot_final" type="overhead_camera.py" />
+  <group ns="bigredrobot">cat
   </group>
 </launch>

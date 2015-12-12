@@ -168,7 +168,7 @@ class RobotInterface:
 
 
     def robot_move_over(self, target):
-            rospy.logwarn('move over target = %i' %(target)      
+            rospy.logwarn('move over target = %i' %(target)  )    
             x0, y0, z0 = self.get_gripper_coords()      
             x1, y1, z1_ = self.block_coords[target]  
             z1 = z1_ + self.BLOCK_HEIGHT            
@@ -187,7 +187,7 @@ class RobotInterface:
         loc = Point(float(x),float(y),float(z))
         hdr = Header(stamp=rospy.Time.now(), frame_id='/base')
         ikreq = SolvePositionIKRequest()
-        pose = PoseStamped(header=hdr, pose=Pose(position=loc, orientation=self.ORIENT))}
+        pose = PoseStamped(header=hdr, pose=Pose(position=loc, orientation=self.ORIENT))
 
         ikreq.pose_stamp.append(pose)
         

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import cv2 as cv
 import lib.visionlib as vl
 import lib.motionlib as ml
@@ -21,9 +22,10 @@ from geometry_msgs.msg import Vector3Stamped, Vector3
 import tf
 
 USE_TRACKBARS = False
-DEPTH_K0 = 0.002
-XY_K0 = 0.0005
-DEFENSE_K0 = 0.2
+#DEPTH_K0 = 0.003
+DEPTH_K0 = 0.000005
+XY_K0 = 0.0008
+DEFENSE_K0 = 0.8
 
 BOARD_MAX_X = 1.0
 BOARD_MIN_X = 0.1
@@ -33,41 +35,35 @@ class Baxter:
         rospy.logwarn("Initializing Baxter")
 
         self.arm = baxter_interface.limb.Limb(arm)
+                
         self.gripper = baxter_interface.Gripper(arm)
         self.gripper.calibrate()
         self.kinematics = baxter_kinematics(arm)
-
-        # control parameters
-        self.pub_rate = 500.0  # Hz
 
         self.interface = baxter_interface.RobotEnable(CHECK_VERSION)
         self._init_state = self.interface.state().enabled
         self.interface.enable()
         
-        # set joint state publishing to 500Hz
-        self.rate_publisher = rospy.Publisher('/robot/joint_state_publish_rate',
-                                         UInt16, queue_size=10)
-        self.rate_publisher.publish(self.pub_rate)
-        self.gripper.close()
         self.gripper.open()
+
 
     def grip_ball(self):
         self.gripper.close()
         
 class Planner:
 
-
-
     DEFENSE_MODE = 0
     ATTACK_MODE = 1
-    
-    ATTACK_POS = {'right_s0': -0.1729563336364746, 'right_s1': -0.9407137170959473, 'right_w0': -0.2538738201049805, 'right_w1': 0.783480686517334, 'right_w2': -2.023704152105713, 'right_e0': 0.411490345880127, 'right_e1': 1.7353157643127441}
+
+    BALL_Z = -0.077#-0.07837517
+
+    ATTACK_POS = {'right_s0': -0.4893398707763672, 'right_s1': -0.03298058690185547, 'right_w0': -1.6582332298095703, 'right_w1': 1.4089613520629884, 'right_w2': -1.2168302585998536, 'right_e0': 1.440024462982178, 'right_e1': 1.6118303110290528}
     
     DEFENSE_POS = {'right_s0': -0.7378447581298828, 'right_s1': 0.2573252768737793, 'right_w0': -1.9105730691284182, 'right_w1': 1.2954467738891602, 'right_w2': -1.3115535721435547, 'right_e0': 1.3337962935424805, 'right_e1': 1.6463448787170412}
 
     # max and min correspond to goal bounds as percentages of the board width
-    max_board_width = 0.73
-    min_board_width = 0.27
+    MAX_BOARD_WIDTH = 0.73
+    MIN_BOARD_WIDTH = 0.27
     
     def __init__(self, game, camera, motion_controller):
         self.camera = camera
@@ -82,8 +78,8 @@ class Planner:
         self.ball_y = data.ball_y
         # Get the current position of the ball relative to the width of the board
         # This thing is a percentage of the width
-        self.rel_ball_pos = ((float(data.center_y)+float(data.height/2)) - data.ball_y)/float(data.height) 
-        #print self.rel_ball_pos
+        self.ball_rel_pos = ((float(data.center_y)+float(data.height/2)) - data.ball_y)/float(data.height) 
+        #print self.ball_rel_pos
 
     def run(self):
         arm = self.motion_controller._arm_obj
@@ -114,12 +110,13 @@ class Planner:
             # Stop stacking blocks    
             #stack_pub.publish("stop")
         
-            # Start offense/defence
-            #self.enter_defense_mode(arm)
-            self.enter_attack_mode(arm)
+            # Start offense/defenSe
+            self.enter_defense_mode()
+            #self.enter_attack_mode()
             print 'Press <esc> to toggle modes'
             while not rospy.is_shutdown():
                 self.raw = cv.blur(camera.get_frame(), (3,3)) 
+                
                 cv.imshow(window_name, self.raw)
                 self.frame = cv.cvtColor(self.raw,cv.COLOR_BGR2HSV)
                 #self.overhead_frame = overhead_camera.get_frame()
@@ -127,33 +124,36 @@ class Planner:
                 if self.current_mode == Planner.DEFENSE_MODE:
                     self.defend()
                     if k == 27:
-                        self.enter_attack_mode(arm)
+                        self.enter_attack_mode()
                 else:
                     self.attack(camera)
                     if k == 27:
-                        self.enter_defense_mode(arm)                
+                        self.enter_defense_mode()                
     
     def defend(self):
-        pass
+        #pass
         #raw_input('Press Enter to see joint angles...')
         #print self.motion_controller._arm_obj.joint_angles()
-        #self.defense_visual_servo()
+        #raw_input('Press Enter to see gripper z coordinate...')
+        #print self.motion_controller.get_gripper_coords()[2]
+        self.defense_visual_servo()
 
-    def enter_attack_mode(self, arm):
+    def enter_attack_mode(self):
         print 'Entering Attack Mode'
         self.current_mode = Planner.ATTACK_MODE
-        arm.move_to_joint_positions(Planner.ATTACK_POS)
+        self.motion_controller.set_joint_positions(Planner.ATTACK_POS)
 
-    def enter_defense_mode(self, arm):
+    def enter_defense_mode(self):
         print 'Entering Defense Mode'
         self.current_mode = Planner.DEFENSE_MODE
-        arm.move_to_joint_positions(Planner.DEFENSE_POS)
+        self.motion_controller.set_joint_positions(Planner.DEFENSE_POS)
 
 
     def attack_visual_servo(self):
-        #u, v, mask2, current_area = vl.locate_pink_ball(self.frame)
-        u, v, mask2, current_area = vl.locate_orange_ball(self.frame)
-        print current_area
+        u, v, mask2, current_area = vl.locate_pink_ball(self.frame)
+        #u, v, mask2, current_area = vl.locate_orange_ball(self.frame)
+        #print current_area
+        current_z = self.motion_controller.get_gripper_coords()[2][0]
         cv.imshow('MASK',mask2)
         # No object is being tracked
         if u == -1 or v == -1:
@@ -161,9 +161,11 @@ class Planner:
             desired_depth_vel = 0.0
         else:
             xi = camera.calc_desired_feat_velocities(u, v, XY_K0)
-            desired_depth_vel = camera.calc_desired_depth_velocity(DEPTH_K0, current_area)
-        if desired_depth_vel > 0:
+            desired_depth_vel = camera.calc_desired_depth_velocity_z(DEPTH_K0, current_area)
+
+        if current_z <= Planner.BALL_Z:
             baxter.grip_ball()
+            rospy.sleep(0.2)
             print "I found the ball!"
             motion_controller.command_velocity(np.zeros(6))
             return True
@@ -191,13 +193,14 @@ class Planner:
             motion_controller.command_velocity(np.zeros(6))
             return False
         # These two lines limit ball_rel_pos to be between the goal posts
-        current_ball_rel_pos = min(max_board_width, current_ball_rel_pos)
-        current_ball_rel_pos = max(min_board_width, current_ball_rel_pos)
+        current_ball_rel_pos = min(Planner.MAX_BOARD_WIDTH, current_ball_rel_pos)
+        current_ball_rel_pos = max(Planner.MIN_BOARD_WIDTH, current_ball_rel_pos)
 
-        ball_pos = ball_rel_pos*(BOARD_MAX_X - BOARD_MIN_X) + BOARD_MIN_X
+        ball_pos = current_ball_rel_pos*(BOARD_MAX_X - BOARD_MIN_X) + BOARD_MIN_X
         hand_pos = self.motion_controller.get_gripper_coords()[0]
 
         x_vel = DEFENSE_K0*(ball_pos - hand_pos)
+        print 'x_vel', x_vel
         squiggle = np.array([x_vel,0,0,0,0,0])
 
         try:
@@ -210,6 +213,8 @@ class Planner:
     def attack(self, camera):
         if self.get_ball(camera):
             self.motion_controller.throw()
+            self.enter_defense_mode()
+            
         
     #TODO: Clean up this huge function
     def get_ball(self, camera):
@@ -245,13 +250,13 @@ class Planner:
             track_x, track_y, mask3, _ = vl.track_object(mask_trackbar)
             cv.imshow('Thresh trackbar',mask3)
 
-        orng_x, orng_y, mask1, current_area = vl.locate_orange_ball(frame)
-        #pink_x, pink_y, mask2, current_area = vl.locate_pink_ball(frame)
+        #orng_x, orng_y, mask1, current_area = vl.locate_orange_ball(frame)
+        pink_x, pink_y, mask2, current_area = vl.locate_pink_ball(frame)
 
         display = frame.copy()
         cv.circle(display, (320, 70), 10, 255, -1) 
-        cv.circle(display, (orng_x, orng_y), 10, (0,0,255), -1) 
-        #cv.circle(display, (pink_x, pink_y), 10, (0,255,0), -1) 
+        #cv.circle(display, (orng_x, orng_y), 10, (0,0,255), -1) 
+        cv.circle(display, (pink_x, pink_y), 10, (0,255,0), -1) 
 
         #cv.imshow('Thresh orange',mask1)
         #cv.imshow('Thresh pink',mask2)
@@ -269,7 +274,7 @@ class Planner:
 
         #k = cv.waitKey(5) & 0xFF
         #if k == 27:
-            #break
+        #    break
         
         #cv.destroyAllWindows()
 def debug_with_trackbars():
@@ -323,6 +328,7 @@ def debug_with_trackbars():
 
 if __name__=="__main__":
     rospy.init_node('main', anonymous=True)
+
     game = Game() # start communication with game server (get arm etc.)
     
     #baxter = Baxter(arm='right') # remove for the competition
@@ -330,6 +336,6 @@ if __name__=="__main__":
     motion_controller = ml.BaxterMotionController(baxter, arm='right')
     camera = vl.BaxterCamera(arm='right')
     planner = Planner(game, camera, motion_controller)
-    debug_with_trackbars()
-    #planner.run()
+    #debug_with_trackbars()
+    planner.run()
 

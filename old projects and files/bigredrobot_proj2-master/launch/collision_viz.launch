@@ -1,6 +1,0 @@
-<launch>
-  <include file="$(find collision_checker)/launch/collision_server.launch">
-       <arg name="visualize" value="true"/>
-  </include>
-
-</launch>

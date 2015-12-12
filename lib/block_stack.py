@@ -8,19 +8,19 @@ from bigredrobot_final.msg import *
 from bigredrobot_final.srv import *
 
 class BlockStackController():
-	'''
-	Create a node to control baxter (via RobotInterface) to stack blocks.
-	Start after RobotInterface intialisation.
-	
-	Example usage:
-		 try:
-		    c = BlockStackController()
-		    c.init_subscribers()
-		    c.run()
-		except rospy.ROSInterruptException:
-		    pass
-	
-	'''
+    '''
+    Create a node to control baxter (via RobotInterface) to stack blocks.
+    Start after RobotInterface intialisation.
+    
+    Example usage:
+         try:
+            c = BlockStackController()
+            c.init_subscribers()
+            c.run()
+        except rospy.ROSInterruptException:
+            pass
+    
+    '''
     
     def __init__(self):
         rospy.init_node("block_stack_controller", anonymous=True)
@@ -151,12 +151,12 @@ class BlockStackController():
         targets = [lgrip,lblocknum,lgrip,ltarget,lgrip]
         for action, target in zip(actions,targets):
             req = MoveRobotRequest()
-                if target is None:
-                    req.action = MoveRobotRequest.ACTION_IDLE
-                    req.target = 0
-                else:                
-                    req.action = action
-                    req.target = target
+            if target is None:
+                req.action = MoveRobotRequest.ACTION_IDLE
+                req.target = 0
+            else:                
+                req.action = action
+                req.target = target
             rospy.loginfo(req)
             if not self.is_done: # stop sending commands if we are done
                 self.move_robot(req)
@@ -164,7 +164,7 @@ class BlockStackController():
                 raise Exception('stop stacking')
         self.state_updated = False
         while not self.state_updated :
-	    	# Block until state is updated, as this controller requires most recent state from interface
+            # Block until state is updated, as this controller requires most recent state from interface
             pass        
 
 

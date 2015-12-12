@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import cv2 as cv
 import lib.visionlib as vl
 import numpy as np
@@ -86,8 +87,10 @@ def run(camera):
             d[y_offset:] = depth_thresh[:-y_offset]
             d[:,x_offset_left:mid] = d[:,:mid-x_offset_left]
             d[:,right_lim-x_offset_right:-x_offset_right] = d[:,right_lim:]
-            d = cv.dilate(d, np.ones((20,20)))
-            d = cv.erode(d, np.ones((20,20)))
+            d = cv.dilate(d, np.ones((15,15)))
+            d = cv.erode(d, np.ones((15,15)))
+            frame = cv.dilate(frame, np.ones((5,5)))
+            frame = cv.erode(frame, np.ones((5,5)))
             frame = cv.bitwise_and(frame,frame,mask = d)
 
         #converting to HSV
@@ -113,7 +116,7 @@ def run(camera):
 
         gray = cv.cvtColor(display,cv.COLOR_BGR2GRAY)
 
-        lower_hsv_pink = np.array([140, 50, 100])
+        lower_hsv_pink = np.array([140, 20, 100])
         upper_hsv_pink = np.array([179, 250, 255])
         mask_pink = cv.inRange(hsv,lower_hsv_pink, upper_hsv_pink)
         pink_x, pink_y, mask_pink, _ = track_ball(mask_pink)        

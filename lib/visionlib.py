@@ -8,10 +8,12 @@ from baxter_interface import camera
 import helper_functions as hf
 import baxter_interface
 from baxter_interface import CHECK_VERSION
+from baxter_core_msgs.srv import OpenCamera, OpenCameraRequest
+from baxter_core_msgs.msg import CameraControl
 
 
 UPPER_PINK1 = [179,220,255]
-LOWER_PINK1 = [150,36,50]
+LOWER_PINK1 = [150,100,5]
 
 # http://www.pages.drexel.edu/~nk752/Visual_Servoing_Article_Part_1.pdf
 class BaxterCamera:
@@ -24,9 +26,6 @@ class BaxterCamera:
         else:
             cam_name = 'right_hand_camera'
 
-        self.cam_ctrl = camera.CameraController(cam_name)
-        #self.cam_ctrl.exposure(50) # set exposure 0-100 or cam_ctrl.CONTROL_AUTO
-
         # arm camera params (right arm values, based on /cameras/.../camera_info_std)
         self.fx = 397.22543258146163
         self.fy = 397.9222130030984
@@ -34,9 +33,27 @@ class BaxterCamera:
         self.cy = 415.42196609153905
 
         self.intrinsics = {'fx':self.fx, 'fy':self.fy, 'cx':self.cx, 'cy':self.cy}
+        '''
+        #rospy.ServiceProxy('/cameras/close \'%s\''%cam_name, std_srvs.srv.Empty)
+        #rospy.ServiceProxy('/cameras/close \'right_hand_camera\'', std_srvs.srv.Empty)
+        camera_open_prox = rospy.ServiceProxy('/cameras/open', OpenCamera)
+        req = OpenCameraRequest()
+        req.name = cam_name
+        req.settings.width = 640
+        req.settings.height = 400
+        ctrl = CameraControl()
+        ctrl.id = ctrl.CAMERA_CONTROL_EXPOSURE
+        ctrl.value = 50
+        req.settings.controls = [ctrl]
+        camera_open_prox(req)
+        
+        print req
+        '''
 
-        rospy.ServiceProxy('/cameras/close \'left_hand_camera\'', std_srvs.srv.Empty)
-        rospy.ServiceProxy('/cameras/open \'{name: %s, settings: {width: 640, height: 400}}\'' %(cam_name), std_srvs.srv.Empty)
+        self.cam_ctrl = camera.CameraController(cam_name)
+        self.cam_ctrl.resolution = (640,400)
+        self.cam_ctrl.exposure = 50 # set exposure 0-100 or cam_ctrl.CONTROL_AUTO
+        self.cam_ctrl.gain = 20 # set gain 0-79 or cam_ctrl.CONTROL_AUTO
 
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/cameras/%s/image" %(cam_name), Image, self.capture_callback)
@@ -71,7 +88,7 @@ class BaxterCamera:
     def calc_desired_feat_velocities(self, u, v, k0=0.001):
         # velocity point toward image center from current feature point
         #center = np.array([self.FRAME_WIDTH/2, self.FRAME_HEIGHT/2])
-        center = np.array([self.FRAME_WIDTH/2, 70])
+        center = np.array([self.FRAME_WIDTH/2 + self.FRAME_WIDTH*0.05, 70])
         current = np.array([u, v])
         velocity = k0*(center-current)
         # print 'center:', center
@@ -83,8 +100,17 @@ class BaxterCamera:
         # Temporarily try and get the ball to be half of the frame width
         # This will need to be replaced with a real number later on.
     	#desired_pixel_area = self.FRAME_WIDTH/3*self.FRAME_HEIGHT/3
-        desired_pixel_area = 22000
+        desired_pixel_area = 25000
         velocity = k0*(current_pixel_area - desired_pixel_area)/1000
+        # negative so that Baxter moves down towards the ball
+        return np.array([velocity])
+    
+    def calc_desired_depth_velocity_z(self, k0, current_z):
+        # Temporarily try and get the ball to be half of the frame width
+        # This will need to be replaced with a real number later on.
+    	#desired_pixel_area = self.FRAME_WIDTH/3*self.FRAME_HEIGHT/3
+        desired_z = -0.07837517
+        velocity = k0*(desired_z - current_z)
         # negative so that Baxter moves down towards the ball
         return np.array([velocity])
 
@@ -171,13 +197,13 @@ def locate_pink_ball(frame):
     frame = cv.blur(frame, (3,3))
     lower_hsv_pink1 = np.array(LOWER_PINK1)
     upper_hsv_pink1 = np.array(UPPER_PINK1)
-    mask_pink1 = cv.inRange(frame,lower_hsv_pink1, upper_hsv_pink1)
+    mask_pink = cv.inRange(frame,lower_hsv_pink1, upper_hsv_pink1)
     
-    lower_hsv_pink2 = np.array([0, 0, 230])
-    upper_hsv_pink2 = np.array([15, 50, 255])
-    mask_pink2 = cv.inRange(frame, lower_hsv_pink2, upper_hsv_pink2)
+    #lower_hsv_pink2 = np.array([0, 0, 230])
+    #upper_hsv_pink2 = np.array([15, 50, 255])
+    #mask_pink2 = cv.inRange(frame, lower_hsv_pink2, upper_hsv_pink2)
     
-    mask_pink = cv.bitwise_or(mask_pink1, mask_pink2)
+    #mask_pink = cv.bitwise_or(mask_pink1, mask_pink2)
     
     return track_object(mask_pink)
     

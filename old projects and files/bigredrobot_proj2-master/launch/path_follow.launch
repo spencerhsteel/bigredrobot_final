@@ -1,3 +1,0 @@
-<launch>
-  <node name="robot_interface" pkg="bigredrobot_proj2" type="path_follower.py" output="screen" />
-</launch>
