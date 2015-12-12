@@ -152,8 +152,10 @@ class Planner:
     def attack_visual_servo(self):
         u, v, mask2, current_area = vl.locate_pink_ball(self.frame)
         #u, v, mask2, current_area = vl.locate_orange_ball(self.frame)
+
         #print current_area
         current_z = self.motion_controller.get_gripper_coords()[2][0]
+
         cv.imshow('MASK',mask2)
         # No object is being tracked
         if u == -1 or v == -1:
@@ -171,7 +173,7 @@ class Planner:
             return True
         #print 'Desired depth vel:', desired_depth_vel
         xi = -np.append(xi, desired_depth_vel)
-        #print xi
+        print 'xi', xi
         vect = Vector3Stamped()
         vect.header.frame_id = '/right_hand_camera'
         vect.header.stamp = rospy.Time(0)
@@ -179,8 +181,8 @@ class Planner:
         try:
             trans_vect = self.tl.transformVector3('/base', vect)
             squiggle = np.array([trans_vect.vector.x,trans_vect.vector.y,trans_vect.vector.z,0,0,0])
-            #print squiggle
-            motion_controller.command_velocity(squiggle)
+            print 'squiggle', squiggle
+            #motion_controller.command_velocity(squiggle)
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             print "you suck"
         
