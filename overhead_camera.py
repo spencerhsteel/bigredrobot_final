@@ -25,8 +25,8 @@ def run(camera):
                     break
             cx = int(box[0][0])
             cy = int(box[0][1])
-            w =  int(box[1][1])
-            h =  int(box[1][0])
+            h =  int(box[1][1])
+            w =  int(box[1][0])
             x = cx - w/2
             y = cy - h/2
             print cx,cy,x,y,w,h
@@ -45,12 +45,12 @@ def run(camera):
                 return
             
     else:
-        cx = 328
-        cy = 198
-        x = 51
-        y = 62
-        w = 554
-        h = 272
+        cx = 333
+        cy = 181
+        x = 50
+        y = 44
+        w = 567
+        h = 275
 
     cv.namedWindow('result')
     # Creating track bar
@@ -79,8 +79,14 @@ def run(camera):
             _, depth_thresh = cv.threshold(depth, 5, 255, cv.THRESH_BINARY)
             d = np.zeros_like(depth_thresh)
             y_offset = 20
+            x_offset_left = 20
+            x_offset_right = 12
+            mid = frame.shape[0]/2
+            right_lim = frame.shape[0]/1.5
             d[y_offset:] = depth_thresh[:-y_offset]
-            d = cv.dilate(d, np.ones((15,15)))
+            d[:,x_offset_left:mid] = d[:,:mid-x_offset_left]
+            d[:,right_lim-x_offset_right:-x_offset_right] = d[:,right_lim:]
+            d = cv.dilate(d, np.ones((20,20)))
             d = cv.erode(d, np.ones((20,20)))
             frame = cv.bitwise_and(frame,frame,mask = d)
 
@@ -101,14 +107,14 @@ def run(camera):
             lower_hsv = np.array([hmin, smin, vmin])
             upper_hsv = np.array([hmax, smax, vmax])
             mask_trackbar = cv.inRange(hsv,lower_hsv, upper_hsv)
-            track_x, track_y, mask3, _ = vl.track_object(mask_trackbar)
+            track_x, track_y, mask3, _ = track_ball(mask_trackbar)
             cv.circle(display, (track_x, track_y), 5, 255, -1) 
             cv.imshow('Thresh trackbar',mask3)
 
         gray = cv.cvtColor(display,cv.COLOR_BGR2GRAY)
 
-        lower_hsv_pink = np.array([140, 79, 78])
-        upper_hsv_pink = np.array([179, 227, 255])
+        lower_hsv_pink = np.array([140, 50, 100])
+        upper_hsv_pink = np.array([179, 250, 255])
         mask_pink = cv.inRange(hsv,lower_hsv_pink, upper_hsv_pink)
         pink_x, pink_y, mask_pink, _ = track_ball(mask_pink)        
 

@@ -8,6 +8,7 @@ import numpy as np
 import baxter_interface
 from baxter_interface import CHECK_VERSION
 from baxter_pykdl import baxter_kinematics
+from bigredrobot_final.msg import *
 
 from std_msgs.msg import (
     UInt16,
@@ -22,6 +23,10 @@ import tf
 USE_TRACKBARS = False
 DEPTH_K0 = 0.002
 XY_K0 = 0.0005
+DEFENSE_K0 = 0.2
+
+BOARD_MAX_X = 1.0
+BOARD_MIN_X = 0.1
 
 class Baxter:
     def __init__(self, arm):
@@ -29,7 +34,7 @@ class Baxter:
 
         self.arm = baxter_interface.limb.Limb(arm)
         self.gripper = baxter_interface.Gripper(arm)
-        self.gripper.calibrate()
+        #self.gripper.calibrate()
         self.kinematics = baxter_kinematics(arm)
 
         # control parameters
@@ -43,8 +48,8 @@ class Baxter:
         self.rate_publisher = rospy.Publisher('/robot/joint_state_publish_rate',
                                          UInt16, queue_size=10)
         self.rate_publisher.publish(self.pub_rate)
-        self.gripper.close()
-        self.gripper.open()
+        #self.gripper.close()
+        #self.gripper.open()
 
     def grip_ball(self):
         self.gripper.close()
@@ -60,6 +65,9 @@ class Planner:
     
     DEFENSE_POS = {'right_s0': -0.7378447581298828, 'right_s1': 0.2573252768737793, 'right_w0': -1.9105730691284182, 'right_w1': 1.2954467738891602, 'right_w2': -1.3115535721435547, 'right_e0': 1.3337962935424805, 'right_e1': 1.6463448787170412}
 
+    # max and min correspond to goal bounds as percentages of the board width
+    max_board_width = 0.73
+    min_board_width = 0.27
     
     def __init__(self, game, camera, motion_controller):
         self.camera = camera
@@ -67,7 +75,15 @@ class Planner:
         self.motion_controller = motion_controller
         self.current_mode = Planner.DEFENSE_MODE
         self.tl = tf.TransformListener()
-        
+        rospy.Subscriber("overhead_camera", OverheadCamera, self.overheadCameraCallback)
+
+    def overheadCameraCallback(self, data):
+        self.ball_x = data.ball_x
+        self.ball_y = data.ball_y
+        # Get the current position of the ball relative to the width of the board
+        # This thing is a percentage of the width
+        self.rel_ball_pos = ((float(data.center_y)+float(data.height/2)) - data.ball_y)/float(data.height) 
+        #print self.rel_ball_pos
 
     def run(self):
         arm = self.motion_controller._arm_obj
@@ -168,37 +184,27 @@ class Planner:
         return False
 
     def defense_visual_servo(self):
-        #u, v, mask2, current_area = vl.locate_pink_ball(self.frame)
-        u, v, mask2, current_area = vl.locate_orange_ball(self.frame)
-        desired_depth_vel = 0
-        
-        cv.imshow('mask',mask2)
-        
-        # No object is being tracked
-        if u == -1 or v == -1:
-            xi = np.zeros(2) # xy vel to zero
-        else:
-            print 'object found:', u, v
-            xi = camera.calc_desired_feat_velocities(u, v, XY_K0)
-            xi[1] = 0.0 # don't move in camera y
-            
-        xi = -np.append(xi, desired_depth_vel)
+        current_ball_rel_pos = self.ball_rel_pos
+        if current_ball_rel_pos < 0:
+            #If we cannot see the ball, stop movement
+            motion_controller.command_velocity(np.zeros(6))
+            return False
+        # These two lines limit ball_rel_pos to be between the goal posts
+        current_ball_rel_pos = min(max_board_width, current_ball_rel_pos)
+        current_ball_rel_pos = max(min_board_width, current_ball_rel_pos)
 
-        vect = Vector3Stamped()
-        vect.header.frame_id = '/right_hand_camera'
-        vect.header.stamp = rospy.Time(0)
-        vect.vector = Vector3(*xi[0:3])
+        ball_pos = ball_rel_pos*(BOARD_MAX_X - BOARD_MIN_X) + BOARD_MIN_X
+        hand_pos = self.motion_controller.get_gripper_coords()[0]
+
+        x_vel = DEFENSE_K0*(ball_pos - hand_pos)
+        squiggle = np.array([x_vel,0,0,0,0,0])
 
         try:
-            trans_vect = self.tl.transformVector3('/base', vect)
-            squiggle = np.array([trans_vect.vector.x,trans_vect.vector.y,trans_vect.vector.z,0,0,0])
             motion_controller.command_velocity(squiggle)
-
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             print "you suck"
         
         return False
-       
 
     def attack(self, camera):
         if self.get_ball(camera):
@@ -295,7 +301,7 @@ def debug_with_trackbars():
         upper_hsv = np.array([hmax, smax, vmax])
         mask_trackbar = cv.inRange(hsv,lower_hsv, upper_hsv)
         track_x, track_y, mask3, area = vl.track_object(mask_trackbar)
-        print area
+        #print area
         cv.imshow('Thresh trackbar',mask3)
 
         display = frame.copy()
@@ -311,6 +317,8 @@ def debug_with_trackbars():
         
     cv.destroyAllWindows()
     
+    
+    
 
 if __name__=="__main__":
     rospy.init_node('main', anonymous=True)
@@ -322,5 +330,6 @@ if __name__=="__main__":
 
     camera = vl.BaxterCamera(arm='right')
     planner = Planner(game, camera, motion_controller, game)
-    #debug_with_trackbars()
-    planner.run()
+    debug_with_trackbars()
+    #planner.run()
+
