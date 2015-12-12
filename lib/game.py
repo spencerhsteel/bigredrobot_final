@@ -26,11 +26,13 @@ class Game:
         self.update_time = rospy.Time.now()
 
         # load 300x300 logo
+        '''
         logo = np.zeros((300,300,3), np.uint8)
         logo[:,0:150] = (255,0,0)
-        logo[:,150:300] = (0,255,0)
+        logo[:,150:300] = (0,255,0)''' # dummy logo
+        logo = cv2.imread('logo.png')
         # Convert to imgmsg
-        logo_msg = bridge.cv2_to_imgmsg(logo, encoding="rgb8")
+        logo_msg = bridge.cv2_to_imgmsg(logo, encoding="bgr8")
 
         # Call init service of game_server and get arm
         init = rospy.ServiceProxy('/game_server/init', Init)
