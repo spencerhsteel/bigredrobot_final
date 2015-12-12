@@ -173,13 +173,13 @@ def locate_pink_ball(frame):
     upper_hsv_pink1 = np.array(UPPER_PINK1)
     mask_pink1 = cv.inRange(frame,lower_hsv_pink1, upper_hsv_pink1)
     
-    lower_hsv_pink2 = np.array([0, 0, 230])
-    upper_hsv_pink2 = np.array([15, 50, 255])
-    mask_pink2 = cv.inRange(frame, lower_hsv_pink2, upper_hsv_pink2)
+    #lower_hsv_pink2 = np.array([0, 0, 230])
+    #upper_hsv_pink2 = np.array([15, 50, 255])
+    #mask_pink2 = cv.inRange(frame, lower_hsv_pink2, upper_hsv_pink2)
     
-    mask_pink = cv.bitwise_or(mask_pink1, mask_pink2)
+    #mask_pink = cv.bitwise_or(mask_pink1, mask_pink2)
     
-    return track_object(mask_pink)
+    return track_object(mask_pink1)
     
 
 if __name__=="__main__":

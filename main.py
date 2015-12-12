@@ -151,9 +151,11 @@ class Planner:
 
 
     def attack_visual_servo(self):
-        #u, v, mask2, current_area = vl.locate_pink_ball(self.frame)
-        u, v, mask2, current_area = vl.locate_orange_ball(self.frame)
-        print current_area
+        u, v, mask2, current_area = vl.locate_pink_ball(self.frame)
+        #u, v, mask2, current_area = vl.locate_orange_ball(self.frame)
+        print 'current_area', current_area
+        print 'u', u
+        print 'v', v
         cv.imshow('MASK',mask2)
         # No object is being tracked
         if u == -1 or v == -1:
@@ -169,7 +171,7 @@ class Planner:
             return True
         #print 'Desired depth vel:', desired_depth_vel
         xi = -np.append(xi, desired_depth_vel)
-        #print xi
+        print 'xi', xi
         vect = Vector3Stamped()
         vect.header.frame_id = '/right_hand_camera'
         vect.header.stamp = rospy.Time(0)
@@ -177,8 +179,8 @@ class Planner:
         try:
             trans_vect = self.tl.transformVector3('/base', vect)
             squiggle = np.array([trans_vect.vector.x,trans_vect.vector.y,trans_vect.vector.z,0,0,0])
-            #print squiggle
-            motion_controller.command_velocity(squiggle)
+            print 'squiggle', squiggle
+            #motion_controller.command_velocity(squiggle)
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             print "you suck"
         
@@ -245,13 +247,13 @@ class Planner:
             track_x, track_y, mask3, _ = vl.track_object(mask_trackbar)
             cv.imshow('Thresh trackbar',mask3)
 
-        orng_x, orng_y, mask1, current_area = vl.locate_orange_ball(frame)
-        #pink_x, pink_y, mask2, current_area = vl.locate_pink_ball(frame)
+        #orng_x, orng_y, mask1, current_area = vl.locate_orange_ball(frame)
+        pink_x, pink_y, mask2, current_area = vl.locate_pink_ball(frame)
 
         display = frame.copy()
         cv.circle(display, (320, 70), 10, 255, -1) 
-        cv.circle(display, (orng_x, orng_y), 10, (0,0,255), -1) 
-        #cv.circle(display, (pink_x, pink_y), 10, (0,255,0), -1) 
+        #cv.circle(display, (orng_x, orng_y), 10, (0,0,255), -1) 
+        cv.circle(display, (pink_x, pink_y), 10, (0,255,0), -1) 
 
         #cv.imshow('Thresh orange',mask1)
         #cv.imshow('Thresh pink',mask2)
@@ -330,6 +332,6 @@ if __name__=="__main__":
     motion_controller = ml.BaxterMotionController(baxter, arm='right')
     camera = vl.BaxterCamera(arm='right')
     planner = Planner(game, camera, motion_controller)
-    debug_with_trackbars()
-    #planner.run()
+    #debug_with_trackbars()
+    planner.run()
 
