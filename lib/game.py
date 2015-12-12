@@ -8,7 +8,9 @@ from game_server.msg import GameState
 
 
 class Game:
-
+    '''
+    Class to communicate with the game server (send logo/teamname, get arm assignment, keep track of phase
+    '''
 
     NOT_RUNNING = 0
     PHASE_I = 1
@@ -30,7 +32,7 @@ class Game:
         logo = np.zeros((300,300,3), np.uint8)
         logo[:,0:150] = (255,0,0)
         logo[:,150:300] = (0,255,0)''' # dummy logo
-        logo = cv2.imread('logo.png')
+        logo = cv.imread('lib/logo.png',cv.IMREAD_COLOR)
         # Convert to imgmsg
         logo_msg = bridge.cv2_to_imgmsg(logo, encoding="bgr8")
 
@@ -49,26 +51,31 @@ class Game:
         return self.current_phase # 0, 1, 2, or 3 (0 indicates game not running)
         
     def get_time_remaining(self):
-        return self.time_remaining.data # return duration type
+        return self.time_remaining # return duration type
         
     def get_update_time(self):
         return self.update_time # returns time that the state was last updated
 
     def game_state_callback(self, msg):
+        if self.arm is None:
+            return
         self.current_phase = msg.current_phase
         self.time_remaining  = msg.time_remaining
         self.update_time = rospy.Time.now()
-        if arm == 'left':	
+        if self.arm == 'left':	
             self.score = msg.score[msg.LEFT]
             self.opponent_score = msg.score[msg.RIGHT]
         else:
             self.score = msg.score[msg.RIGHT]
             self.opponent_score = msg.score[msg.LEFT]
+        print 'phase:', self.current_phase
+        print 'time remaining:', self.get_time_remaining()
 
 
 if __name__ == '__main__':
+    rospy.init_node('game_server_test')
     game = Game()
     print game.get_arm()
-    while game.current_phase is None:
-        pass
+    while not rospy.is_shutdown():
+            pass
     print game.current_phase

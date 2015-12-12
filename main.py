@@ -314,10 +314,12 @@ def debug_with_trackbars():
 
 if __name__=="__main__":
     rospy.init_node('main', anonymous=True)
-    game = Game()
-    baxter = Baxter(arm='right')
+    game = Game() # start communication with game server (get arm etc.)
+    
+    baxter = Baxter(arm='right') # remove for the competition
+    # baxter = Baxter(arm=game.get_arm())  
     motion_controller = ml.BaxterMotionController(baxter, arm='right')
-    #transform_test()
+
     camera = vl.BaxterCamera(arm='right')
     planner = Planner(game, camera, motion_controller, game)
     #debug_with_trackbars()

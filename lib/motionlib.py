@@ -48,7 +48,7 @@ class BaxterMotionController:
 
          # set joint state publishing to 500Hz
         self.pub_rate = 500.0  # Hz
-        self.rate_publisher = rospy.Publisher('robot/joint_state_publish_rate',
+        self.rate_publisher = rospy.Publisher('/robot/joint_state_publish_rate',
                                          UInt16, queue_size=10)
         self.rate_publisher.publish(self.pub_rate)
 
