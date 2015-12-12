@@ -11,9 +11,6 @@ from std_msgs.msg import (
     String
 )
 
-import baxter_interface
-
-from baxter_interface import CHECK_VERSION
 
 class BaxterMotionController:
     '''
@@ -31,7 +28,7 @@ class BaxterMotionController:
     def __init__(self, baxter, arm):
 
         self.arm = arm # arm string
-        self._arm_obj = baxter.arm # arm object
+        self._arm_obj = baxter.arm_obj # arm object
         self._gripper_obj = baxter.gripper
 
         self._joint_names = self._arm_obj.joint_names()
@@ -52,9 +49,6 @@ class BaxterMotionController:
     ########################################
     # Housekeeping functions
     ########################################
-
-    def set_joint_positions(self,angles):
-        self._arm_obj.move_to_joint_positions(angles)
 
     def _reset_control_modes(self):
         '''
@@ -84,6 +78,9 @@ class BaxterMotionController:
     ########################################
     # Helper functions
     ########################################
+
+    def set_joint_positions(self,angles):
+        self._arm_obj.move_to_joint_positions(angles)
 
     def get_gripper_coords(self):
         pos = self._arm_obj.endpoint_pose().popitem()[1]

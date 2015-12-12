@@ -199,7 +199,7 @@ def track_ball(mask):
     return x, y, morphed_mask, area
 
 if __name__=="__main__":
-    pub = rospy.Publisher('overhead_camera', OverheadCamera, queue_size = 10)
+    pub = rospy.Publisher('/bigredrobot/overhead_camera', OverheadCamera, queue_size = 10)
     rospy.init_node('overhead_camera', anonymous=True)
         
     camera = vl.OverheadCamera()

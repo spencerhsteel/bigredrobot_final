@@ -34,11 +34,10 @@ class Baxter:
     def __init__(self, arm):
         rospy.logwarn("Initializing Baxter")
 
-        self.arm = baxter_interface.limb.Limb(arm)
+        self.arm_obj = baxter_interface.limb.Limb(arm)
                 
         self.gripper = baxter_interface.Gripper(arm)
         self.gripper.calibrate()
-        self.kinematics = baxter_kinematics(arm)
 
         self.interface = baxter_interface.RobotEnable(CHECK_VERSION)
         self._init_state = self.interface.state().enabled
@@ -67,20 +66,14 @@ class Planner:
     
     def __init__(self, game, camera, motion_controller):
         self.camera = camera
-        #self.overhead_camera = overhead_camera
         self.motion_controller = motion_controller
-        self.current_mode = Planner.DEFENSE_MODE
+
         self.tl = tf.TransformListener()
-        rospy.Subscriber("overhead_camera", OverheadCamera, self.overheadCameraCallback)
 
-    def overheadCameraCallback(self, data):
-        self.ball_x = data.ball_x
-        self.ball_y = data.ball_y
-        # Get the current position of the ball relative to the width of the board
-        # This thing is a percentage of the width
-        self.ball_rel_pos = ((float(data.center_y)+float(data.height/2)) - data.ball_y)/float(data.height) 
-        #print self.ball_rel_pos
+        self.current_mode = Planner.DEFENSE_MODE
+        rospy.Subscriber("/bigredrobot/overhead_camera", OverheadCamera, self.overhead_camera_callback)
 
+    
     def run(self):
         arm = self.motion_controller._arm_obj
         
@@ -97,8 +90,8 @@ class Planner:
         elif phase == Game.PHASE_II:     
             ## Stack blocks
     
-            stack_pub = rospy.Publisher('command', String)
-            stack_pub.publish("stack_ascending")
+            stack_pub = rospy.Publisher('/bigredrobot/command', String)
+            stack_pub.publish("scatter")
             
             # # Maybe check time remaining? Otherwise just go until
             #remaining_time = game.get_remaining_time() # duration
@@ -130,6 +123,12 @@ class Planner:
                     if k == 27:
                         self.enter_defense_mode()                
     
+    ######## ATTACK AND DEFEND FUNCTIONS #############
+    def attack(self, camera):
+        if self.get_ball(camera):
+            self.motion_controller.throw()
+            self.enter_defense_mode()
+
     def defend(self):
         #pass
         #raw_input('Press Enter to see joint angles...')
@@ -148,7 +147,7 @@ class Planner:
         self.current_mode = Planner.DEFENSE_MODE
         self.motion_controller.set_joint_positions(Planner.DEFENSE_POS)
 
-
+    ######## VISUAL SERVO FUNCTIONS #############
     def attack_visual_servo(self):
         u, v, mask2, current_area = vl.locate_pink_ball(self.frame)
         #u, v, mask2, current_area = vl.locate_orange_ball(self.frame)
@@ -212,12 +211,15 @@ class Planner:
         
         return False
 
-    def attack(self, camera):
-        if self.get_ball(camera):
-            self.motion_controller.throw()
-            self.enter_defense_mode()
-            
-        
+    def overhead_camera_callback(self, data):
+        self.ball_x = data.ball_x
+        self.ball_y = data.ball_y
+        # Get the current position of the ball relative to the width of the board
+        # This thing is a percentage of the width
+        self.ball_rel_pos = ((float(data.center_y)+float(data.height/2)) - data.ball_y)/float(data.height) 
+        #print self.ball_rel_pos
+
+
     #TODO: Clean up this huge function
     def get_ball(self, camera):
        
@@ -332,12 +334,13 @@ if __name__=="__main__":
     rospy.init_node('main', anonymous=True)
 
     game = Game() # start communication with game server (get arm etc.)
-    
-    #baxter = Baxter(arm='right') # remove for the competition
-    baxter = Baxter(arm=game.get_arm())  
-    motion_controller = ml.BaxterMotionController(baxter, arm='right')
-    camera = vl.BaxterCamera(arm='right')
+    arm = game.get_arm()
+
+    baxter = Baxter(arm)  
+    motion_controller = ml.BaxterMotionController(baxter, arm)
+    camera = vl.BaxterCamera(arm)
     planner = Planner(game, camera, motion_controller)
+
     #debug_with_trackbars()
     planner.run()
 

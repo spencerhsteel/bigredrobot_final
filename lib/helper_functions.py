@@ -4,7 +4,6 @@ import numpy as np
 import rospy
 import rospkg
 import xml.etree.ElementTree as ET
-from scipy import interpolate
 
 frame_dict_right = { "right_s0": "right_upper_shoulder",
                     "right_s1": "right_lower_shoulder",

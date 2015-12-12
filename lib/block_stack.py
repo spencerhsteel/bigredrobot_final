@@ -47,8 +47,8 @@ class BlockStackController():
             
 
     def init_subscribers(self):
-        rospy.Subscriber("state", State, self.state_update)
-        rospy.Subscriber("command", String, self.command_update)
+        rospy.Subscriber("/bigredrobot/state", State, self.state_update)
+        rospy.Subscriber("/bigredrobot/command", String, self.command_update)
 
     def is_scattered(self):
         if all([x <= 0 for x in self.blocks_over]):
@@ -134,7 +134,6 @@ class BlockStackController():
     def split_stack(self, currentblock, top_left, top_right):
         # move a given block on top of block top_left if it is odd, or top right if it is even
         # return the topmost block in the left and right stacks
-        # left arm moves even numbered blocks
         if currentblock % 2 == 0:
             self.move(currentblock, top_left)
             top_left = currentblock
@@ -144,7 +143,7 @@ class BlockStackController():
         return top_left, top_right
 
     def move(self, blocknum, target):
-        # Execute open->move_to->close->move_over sequence in both arms, simultaneously moving blocks lblocknum and rblocknum on top of ltarget and rtarget, respectively. When block and target values are both None the respective arm will be idle.
+        # Execute open->move_to->close->move_over sequence
         actions = [MoveRobotRequest.ACTION_OPEN_GRIPPER, MoveRobotRequest.ACTION_MOVE_TO,
                     MoveRobotRequest.ACTION_CLOSE_GRIPPER, MoveRobotRequest.ACTION_MOVE_OVER,
                     MoveRobotRequest.ACTION_OPEN_GRIPPER]
@@ -183,9 +182,8 @@ class BlockStackController():
 
 
     def run(self):
-        self.pub = rospy.Publisher('debug_out', String, queue_size=10)
-        rospy.wait_for_service('move_robot')
-        self.move_robot = rospy.ServiceProxy('move_robot', MoveRobot)
+        rospy.wait_for_service('/bigredrobot/move_robot')
+        self.move_robot = rospy.ServiceProxy('/bigredrobot/move_robot', MoveRobot)
         try:
             while not self.is_done and not rospy.is_shutdown():                
                 if self.command :

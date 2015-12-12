@@ -1,21 +1,15 @@
 import cv2 as cv
 import numpy as np
 import rospy
-import std_srvs.srv
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from baxter_interface import camera
 import helper_functions as hf
-import baxter_interface
-from baxter_interface import CHECK_VERSION
-from baxter_core_msgs.srv import OpenCamera, OpenCameraRequest
-from baxter_core_msgs.msg import CameraControl
 
 
 UPPER_PINK1 = [179,220,255]
 LOWER_PINK1 = [150,100,5]
 
-# http://www.pages.drexel.edu/~nk752/Visual_Servoing_Article_Part_1.pdf
 class BaxterCamera:
     def __init__(self, arm='right'):
         self.FRAME_WIDTH = 640
@@ -33,22 +27,6 @@ class BaxterCamera:
         self.cy = 415.42196609153905
 
         self.intrinsics = {'fx':self.fx, 'fy':self.fy, 'cx':self.cx, 'cy':self.cy}
-        '''
-        #rospy.ServiceProxy('/cameras/close \'%s\''%cam_name, std_srvs.srv.Empty)
-        #rospy.ServiceProxy('/cameras/close \'right_hand_camera\'', std_srvs.srv.Empty)
-        camera_open_prox = rospy.ServiceProxy('/cameras/open', OpenCamera)
-        req = OpenCameraRequest()
-        req.name = cam_name
-        req.settings.width = 640
-        req.settings.height = 400
-        ctrl = CameraControl()
-        ctrl.id = ctrl.CAMERA_CONTROL_EXPOSURE
-        ctrl.value = 50
-        req.settings.controls = [ctrl]
-        camera_open_prox(req)
-        
-        print req
-        '''
 
         self.cam_ctrl = camera.CameraController(cam_name)
         self.cam_ctrl.resolution = (640,400)

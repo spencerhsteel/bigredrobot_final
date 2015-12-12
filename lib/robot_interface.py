@@ -9,7 +9,6 @@ from geometry_msgs.msg import (
     PoseStamped,
     Pose,
     Point,
-    Quaternion,
 )
 
 from std_msgs.msg import Header
@@ -27,17 +26,6 @@ class RobotInterface:
 	Start before BlockStackController intialisation.
 	
 	Stop node / finish stacking by sending a DONE action via MoveRobot srv call
-	
-	Example usage:
-		try:
-			robint = RobotInterface()
-			robint.init_state()
-			robint.init_publisher()
-			robint.init_service()
-			robint.run()
-
-		except rospy.ROSInterruptException:
-			pass
 	
 	'''
     def __init__(self, arm):        
@@ -80,7 +68,7 @@ class RobotInterface:
             self.gripper_closed = True  
            
 
-        # augment world state with coordinates
+        # augment world state with coordinates #### CHANGE FOR COMPETITION
         pose = self.limb.endpoint_pose()
         pos = pose.popitem()[1]
         rospy.logwarn(pos)
@@ -106,7 +94,7 @@ class RobotInterface:
             
 
     def init_publisher(self):
-        self.pub = rospy.Publisher('state', State, queue_size=10)
+        self.pub = rospy.Publisher('/bigredrobot/state', State, queue_size=10)
 
     # Callback function for move_robot server
     def handle_move_robot(self, req):    
@@ -204,7 +192,7 @@ class RobotInterface:
             
 
     def init_service(self):
-        self.srv = rospy.Service('move_robot', MoveRobot, self.handle_move_robot) 
+        rospy.Service('/bigredrobot/move_robot', MoveRobot, self.handle_move_robot) 
     
     def run(self):
    		self.done = False
@@ -221,7 +209,14 @@ class RobotInterface:
 
 if __name__ == '__main__':
     try:
-        robint = RobotInterface()
+        rospy.wait_for_service('/bigredrobot/arm')
+        get_arm_bool = rospy.ServiceProxy('/bigredrobot/arm')
+        if get_arm_bool() is True:
+            arm = 'right'
+        else:
+            arm = 'left'
+
+        robint = RobotInterface(arm)
         robint.init_state()
         robint.init_publisher()
         robint.init_service()
