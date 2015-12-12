@@ -43,6 +43,8 @@ class RobotInterface:
     def __init__(self, arm):        
         rospy.init_node("robot_interface", anonymous=True)
 
+        self.is_done = False
+
         # initialise limb and gripper
         self.limb = baxter_interface.Limb(arm) 
         self.gripper = baxter_interface.Gripper(arm)
@@ -54,9 +56,10 @@ class RobotInterface:
         self.ik_solve = rospy.ServiceProxy("ExternalTools/%s/PositionKinematicsNode/IKService"%(arm), SolvePositionIK)
 
 
-    def init_state(self, num_blocks, configuration):
-        self.num_blocks = num_blocks
-        #configuration = rospy.get_param('configuration')
+    def init_state(self):
+        self.num_blocks = rospy.get_param('/num_blocks')
+        num_blocks = self.num_blocks # We suck
+        configuration = rospy.get_param('/configuration')
      
         self.gripper_at = 0
         self.gripper_closed = 0
@@ -138,7 +141,7 @@ class RobotInterface:
         elif req.action==req.ACTION_IDLE:
             pass # nothing to see here
         elif req.action==req.DONE_STACKING:
-        	self.done = True
+        	self.is_done = True
         return False
 
 
@@ -182,7 +185,7 @@ class RobotInterface:
     def move_robot(self, x, y, z):
 	    # Command arm to move to coordinates x,y,z
         loc = Point(float(x),float(y),float(z))
-        hdr = Header(stamp=rospy.Time.now(), frame_id='base')
+        hdr = Header(stamp=rospy.Time.now(), frame_id='/base')
         ikreq = SolvePositionIKRequest()
         pose = PoseStamped(header=hdr, pose=Pose(position=loc, orientation=self.ORIENT))}
 
@@ -207,7 +210,7 @@ class RobotInterface:
    		self.done = False
 		rospy.logwarn("Ready to receive commands")
         rate = rospy.Rate(1) # Update state 1hz
-        while not self.done and not rospy.is_shutdown():
+        while not self.is_done and not rospy.is_shutdown():
             state = State()
             state.blocks_over = self.blocks_over
             state.gripper_at = self.gripper_at

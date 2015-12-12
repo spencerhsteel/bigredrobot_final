@@ -105,6 +105,7 @@ class BaxterMotionController:
     def command_velocity(self, squiggle):
         '''
         Commands joint velocities using jacobian
+        Squiggle is an np.array (1D)!!!!!!
         '''
         squiggle = np.matrix(squiggle).T
         J = self._kin.jacobian()
@@ -166,13 +167,12 @@ class BaxterMotionController:
 
     def follow_line_p_control(self, p1, p2, v0, kp):
         '''
+        p1, p2 are 1D np arrays!!!!!!!!!!!!!!!!1
         Follows a straight line in the workspace using proportional control
         '''
         rate = rospy.Rate(self.pub_rate)
         t0 = rospy.Time.now()
         t = 0
-        p1 = p1.squeeze()
-        p2 = p2.squeeze()
         p12 = p2 - p1 # relative position of p1 wrt p2
         max_dist = np.linalg.norm(p12)
         max_dist_actual = self.dist_from_point(p2)
@@ -208,14 +208,14 @@ class BaxterMotionController:
         # move to throw start position
         self._arm_obj.move_to_joint_positions(start_angles)
 
-        p_0 = self.get_gripper_coords() # as [x, y, z].T matrix
-        delta_p_throw = np.matrix([0, -throw_dist, 0]).T # throw along the negative y for the right arm
+        p_0 = self.get_gripper_coords().squeeze() # as np.array([x, y, z])
+        delta_p_throw = np.array([0, -throw_dist, 0]) # throw along the negative y for the right arm
         p_1 = p_0 + delta_p_throw
         p_2 = p_1 + delta_p_throw/2 # move half as far again after release
 
-        self.follow_line_p_control(p_0,p_1,throw_vel,self.KP)
+        self.follow_line_p_control(p_0, p_1, throw_vel, self.KP)
         self._gripper_obj.open() # bring the pain
-        self.follow_line_p_control(p_1,p_2,throw_vel,self.KP)
+        self.follow_line_p_control(p_1, p_2, throw_vel, self.KP)
         # move to throw start position
         self.arm.move_to_joint_positions(start_angles)
         

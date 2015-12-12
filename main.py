@@ -1,6 +1,7 @@
 import cv2 as cv
 import lib.visionlib as vl
 import lib.motionlib as ml
+from lib.game import Game 
 import rospy
 import numpy as np
 
@@ -10,7 +11,8 @@ from baxter_pykdl import baxter_kinematics
 
 from std_msgs.msg import (
     UInt16,
-    Header
+    Header,
+    String
 )
 
 from geometry_msgs.msg import Vector3Stamped, Vector3
@@ -38,7 +40,7 @@ class Baxter:
         self.interface.enable()
         
         # set joint state publishing to 500Hz
-        self.rate_publisher = rospy.Publisher('robot/joint_state_publish_rate',
+        self.rate_publisher = rospy.Publisher('/robot/joint_state_publish_rate',
                                          UInt16, queue_size=10)
         self.rate_publisher.publish(self.pub_rate)
         self.gripper.close()
@@ -48,6 +50,9 @@ class Baxter:
         self.gripper.close()
         
 class Planner:
+
+
+
     DEFENSE_MODE = 0
     ATTACK_MODE = 1
     
@@ -56,7 +61,7 @@ class Planner:
     DEFENSE_POS = {'right_s0': -0.7378447581298828, 'right_s1': 0.2573252768737793, 'right_w0': -1.9105730691284182, 'right_w1': 1.2954467738891602, 'right_w2': -1.3115535721435547, 'right_e0': 1.3337962935424805, 'right_e1': 1.6463448787170412}
 
     
-    def __init__(self, camera, motion_controller):
+    def __init__(self, game, camera, motion_controller):
         self.camera = camera
         #self.overhead_camera = overhead_camera
         self.motion_controller = motion_controller
@@ -70,23 +75,46 @@ class Planner:
         window_name = 'Wrist Camera'
         cv.namedWindow(window_name)
         
-        #self.enter_defense_mode(arm)
-        self.enter_attack_mode(arm)
-        print 'Press <esc> to toggle modes'
-        while not rospy.is_shutdown():
-            self.raw = cv.blur(camera.get_frame(), (3,3)) 
-            cv.imshow(window_name, self.raw)
-            self.frame = cv.cvtColor(self.raw,cv.COLOR_BGR2HSV)
-            #self.overhead_frame = overhead_camera.get_frame()
-            k = cv.waitKey(5)
-            if self.current_mode == Planner.DEFENSE_MODE:
-                self.defend()
-                if k == 27:
-                    self.enter_attack_mode(arm)
-            else:
-                self.attack(camera)
-                if k == 27:
-                    self.enter_defense_mode(arm)                
+        ## Check phase
+        phase = self.game.get_current_phase()
+        if phase == Game.PHASE_I or phase == Game.NOT_RUNNING:
+            # nothing happens (wait for phase 2)
+            pass 
+            
+        elif phase == Game.PHASE_II:     
+            ## Stack blocks
+    
+            stack_pub = rospy.Publisher('command', String)
+            stack_pub.publish("stack_ascending")
+            
+            # # Maybe check time remaining? Otherwise just go until
+            #remaining_time = game.get_remaining_time() # duration
+            #state_update_time = game.get_update_time() # time
+            #while rospy.Time.now()
+            #    pass
+                
+        elif phase == Game.PHASE_III:
+            # Stop stacking blocks    
+            stack_pub.publish("stop")
+        
+            # Start offense/defence
+            #self.enter_defense_mode(arm)
+            self.enter_attack_mode(arm)
+            print 'Press <esc> to toggle modes'
+            while not rospy.is_shutdown():
+                self.raw = cv.blur(camera.get_frame(), (3,3)) 
+                cv.imshow(window_name, self.raw)
+                self.frame = cv.cvtColor(self.raw,cv.COLOR_BGR2HSV)
+                #self.overhead_frame = overhead_camera.get_frame()
+                k = cv.waitKey(5)
+                if self.current_mode == Planner.DEFENSE_MODE:
+                    self.defend()
+                    if k == 27:
+                        self.enter_attack_mode(arm)
+                else:
+                    self.attack(camera)
+                    if k == 27:
+                        self.enter_defense_mode(arm)                
     
     def defend(self):
         pass
@@ -238,6 +266,7 @@ class Planner:
         
         #cv.destroyAllWindows()
 def debug_with_trackbars():
+
     cv.namedWindow('result')
     callback = lambda x: 0
     cv.createTrackbar('hmin', 'result', 0, 179, callback)
@@ -275,8 +304,6 @@ def debug_with_trackbars():
         cv.imshow('result', display)
 
         rate.sleep()
-        
-       
 
         k = cv.waitKey(5) & 0xFF
         if k == 27:
@@ -287,10 +314,11 @@ def debug_with_trackbars():
 
 if __name__=="__main__":
     rospy.init_node('main', anonymous=True)
+    game = Game()
     baxter = Baxter(arm='right')
     motion_controller = ml.BaxterMotionController(baxter, arm='right')
     #transform_test()
     camera = vl.BaxterCamera(arm='right')
-    planner = Planner(camera, motion_controller)
+    planner = Planner(game, camera, motion_controller, game)
     #debug_with_trackbars()
     planner.run()

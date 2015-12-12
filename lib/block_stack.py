@@ -23,8 +23,9 @@ class BlockStackController():
 	'''
     
     def __init__(self):
-        rospy.init_node("controller", anonymous=True)
+        rospy.init_node("block_stack_controller", anonymous=True)
         self.command = None        
+        self.is_done = False
 
     def state_update(self, state):
         self.blocks_over = state.blocks_over
@@ -35,6 +36,15 @@ class BlockStackController():
 
     def command_update(self, command):
         self.command = command.data
+        
+        if self.command == "stop":
+            req = MoveRobotRequest()
+            req.action = MoveRobotRequest.DONE_STACKING
+            req.target = 0
+            self.move_robot(req) # this should stop the robot_interface node    
+            # Stop stacking
+            self.is_done = True # this will prevent any further service calls from happening
+            
 
     def init_subscribers(self):
         rospy.Subscriber("state", State, self.state_update)
@@ -148,9 +158,12 @@ class BlockStackController():
                     req.action = action
                     req.target = target
             rospy.loginfo(req)
-            self.move_robot(req)
+            if not self.is_done: # stop sending commands if we are done
+                self.move_robot(req)
+            else: # throw exception to exit control loop
+                raise Exception('stop stacking')
         self.state_updated = False
-        while not self.state_updated:
+        while not self.state_updated :
 	    	# Block until state is updated, as this controller requires most recent state from interface
             pass        
 
@@ -163,10 +176,7 @@ class BlockStackController():
         elif self.command == "stack_descending":
             self.control_stack_descending()
         elif self.command == "stack_odd_even":
-            if self.num_arms == 2:
-                self.control_stack_odd_even()
-            else:
-                rospy.logwarn('odd_even only available in bimanual mode, try again')
+            rospy.logwarn('odd_even only available in bimanual mode, try again')
         else:
             rospy.logwarn('You suck at typing. invalid name, try again.')
         self.command = None
@@ -176,10 +186,12 @@ class BlockStackController():
         self.pub = rospy.Publisher('debug_out', String, queue_size=10)
         rospy.wait_for_service('move_robot')
         self.move_robot = rospy.ServiceProxy('move_robot', MoveRobot)
-        
-        while not rospy.is_shutdown():                
-            if self.command :
-                self.control()
+        try:
+            while not self.is_done and not rospy.is_shutdown():                
+                if self.command :
+                    self.control()
+        except Exception as ex:
+            print ex # stop node
 
 
 if __name__ == '__main__':
