@@ -11,7 +11,7 @@ from bigredrobot_final.srv import Trigger, TriggerResponse
 
 
 TEST_DEBUG = True
-TEST_ARM = 'right'
+TEST_ARM = 'left'
 
 class Game:
     '''

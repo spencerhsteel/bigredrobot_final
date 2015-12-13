@@ -10,4 +10,9 @@ Things to calibrate:
     - Overhead camera arena bounds
     - Attack/defense/throw positions
     
+
+SWITCHES:
+    - game.py TEST_DEBUG = False
+    - main.py CALIBRATE = False
+    * robot\_interface.py USE_PARAMS = False
     

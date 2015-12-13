@@ -18,6 +18,9 @@ from baxter_core_msgs.srv import (
 
 import baxter_interface 
 
+USE_PARAMS = False
+
+
 class RobotInterface:
     '''
     Create a node to handle MoveRobot service calls RobotInterface and move baxter accordingly.
@@ -44,23 +47,27 @@ class RobotInterface:
 
 
     def init_state(self):
-        self.num_blocks = rospy.get_param('/num_blocks')
+        if USE_PARAMS:
+            self.num_blocks = rospy.get_param('/num_blocks')
+
+            configuration = rospy.get_param('/configuration')
+        else:
+            self.num_blocks = 5
+            configuration = 'stacked_ascending'
         num_blocks = self.num_blocks # We suck
-        configuration = rospy.get_param('/configuration')
-     
+
         self.gripper_at = 0
         self.gripper_closed = 0
         
         # convention: every block has a corresponding 'virtual' block referred to by -blocknum
         if configuration=='scattered':
-            # Symbolic only
             self.blocks_over = list(range(-num_blocks+1,1)) # e.g [-2, -1, 0]
             self.gripper_at = num_blocks
         elif configuration=='stacked_ascending':
             self.blocks_over = list(range(num_blocks)) # e.g [0, 1, 2]
             self.blocks_over[0] = 0
             self.gripper_at = num_blocks
-        elif configuration=='stacked_descending':
+        else :
             self.blocks_over = list(range(2,num_blocks+1)) # e.g [2, 3, 0]
             self.blocks_over.append(0)
             self.gripper_at = 1

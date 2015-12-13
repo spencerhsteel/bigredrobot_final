@@ -68,6 +68,7 @@ class Planner:
     def __init__(self, game, camera, motion_controller):
         self.camera = camera
         self.motion_controller = motion_controller
+        self.game = game
 
         self.arm = game.get_arm()
 
@@ -83,7 +84,7 @@ class Planner:
         window_name = 'Wrist Camera'
         cv.namedWindow(window_name)
         
-        stack_pub = rospy.Publisher('/bigredrobot/command', String)
+        stack_pub = rospy.Publisher('/bigredrobot/command', String, queue_size=10)
         
         ## Check phase
         #phase = self.game.get_current_phase() ######### UNCOMMENT FOR COMPETITION
@@ -103,13 +104,14 @@ class Planner:
             
         while phase == Game.PHASE_II and not rospy.is_shutdown():     
             ## Stack blocks
-            phase = self.game.get_current_phase()
+            rospy.logwarn('PHASE II')
+            #phase = self.game.get_current_phase()
     
-            stack_pub = rospy.Publisher('/bigredrobot/command', String)
             stack_pub.publish("scatter")
             rospy.sleep(0.5)
            
-        if phase == Game.PHASE_III:     
+        if phase == Game.PHASE_III:  
+            rospy.logwarn('PHASE III')   
             # Stop stacking blocks    
             stack_pub.publish("stop")
         

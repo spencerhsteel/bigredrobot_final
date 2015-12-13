@@ -38,6 +38,7 @@ class BlockStackController():
         self.command = command.data
         
         if self.command == "stop":
+            rospy.logwarn('Controller received stop on /command')
             req = MoveRobotRequest()
             req.action = MoveRobotRequest.DONE_STACKING
             req.target = 0
@@ -160,6 +161,7 @@ class BlockStackController():
             if not self.is_done: # stop sending commands if we are done
                 self.move_robot(req)
             else: # throw exception to exit control loop
+                rospy.logwarn(' STOOOOOPPPPP STACKING')
                 raise Exception('stop stacking')
         self.state_updated = False
         while not self.state_updated :
@@ -184,18 +186,18 @@ class BlockStackController():
     def run(self):
         rospy.wait_for_service('/bigredrobot/move_robot')
         self.move_robot = rospy.ServiceProxy('/bigredrobot/move_robot', MoveRobot)
-        try:
-            while not self.is_done and not rospy.is_shutdown():                
+        try:        
+            while not self.is_done and not rospy.is_shutdown():     
                 if self.command :
                     self.control()
         except Exception as ex:
-            print ex # stop node
+            rospy.logwarn(ex) # stop node
 
 
 if __name__ == '__main__':
-    try:
-        c = BlockStackController()
-        c.init_subscribers()
-        c.run()
-    except rospy.ROSInterruptException:
-        pass
+
+    c = BlockStackController()
+    c.init_subscribers()
+    c.run()
+
+        
