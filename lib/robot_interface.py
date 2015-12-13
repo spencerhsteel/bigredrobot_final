@@ -85,7 +85,7 @@ class RobotInterface:
             nextz = nextz - self.BLOCK_HEIGHT
             nextblock = self.blocks_over[nextblock-1]
             
-        for block, coord in self.block_coords.copy().iteritems()
+        for block, coord in self.block_coords.copy().iteritems():
             self.block_coords[block] = [coord[1], coord[0], coord[2]]
             
         self.ORIENT = pose.popitem()[1]

@@ -9,6 +9,10 @@ import rospkg
 
 from bigredrobot_final.srv import Trigger, TriggerResponse
 
+
+TEST_DEBUG = True
+TEST_ARM = 'right'
+
 class Game:
     '''
     Class to communicate with the game server (send logo/teamname, get arm assignment, keep track of phase)
@@ -22,7 +26,6 @@ class Game:
 
 
     def __init__(self):
-        print "initialising game"
         bridge = CvBridge()
         
         self.current_phase = Game.PHASE_I
@@ -45,6 +48,17 @@ class Game:
             logo = cv.flip(logo,1)
         if np.random.random(1) < 0.5:
             logo = cv.flip(logo,0)
+        rand = np.random.random(1)
+        rows, cols, _ = logo.shape
+        if rand < 0.25:
+            R = cv.getRotationMatrix2D((cols/2,rows/2),0,1)
+        elif rand < 0.5:
+            R = cv.getRotationMatrix2D((cols/2,rows/2),90,1)
+        elif rand < 0.75:
+            R = cv.getRotationMatrix2D((cols/2,rows/2),180,1)
+        else:
+            R = cv.getRotationMatrix2D((cols/2,rows/2),270,1)
+        logo = cv.warpAffine(logo, R, (cols,rows))
             
         
         
@@ -52,12 +66,13 @@ class Game:
         logo_msg = bridge.cv2_to_imgmsg(logo, encoding="bgr8")
 
         # Call init service of game_server and get arm
-        ''' #################################################UNCOMMENT FOR COMPETITION ######################
-        init = rospy.ServiceProxy('/game_server/init', Init)
-        response = init("bigredrobot", logo_msg)
-        self.arm = response.arm
-        '''
-        self.arm = 'right' ########################################CCCCHHHHHHHHHAAAAAAAAAAANNNNNNGGGEEEEEEE##############
+        if TEST_DEBUG:
+            self.arm = TEST_ARM
+        else:
+            init = rospy.ServiceProxy('/game_server/init', Init)
+            response = init("bigredrobot", logo_msg)
+            self.arm = response.arm
+        
 
         # Subscribe to game_state updates
         #rospy.Subscriber('/game_server/game_state', GameState, self.game_state_callback) #### UNCOMMENT IN REAL CODE

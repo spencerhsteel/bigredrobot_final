@@ -3,25 +3,22 @@ import cv2 as cv
 import lib.visionlib as vl
 import lib.motionlib as ml
 from lib.game import Game 
-import rospy
+import rospy, baxter_interface, tf
 import numpy as np
 
-import baxter_interface
 from baxter_interface import CHECK_VERSION
 from baxter_pykdl import baxter_kinematics
 from bigredrobot_final.msg import *
 
-from std_msgs.msg import (
-    UInt16,
-    Header,
-    String
-)
-
+from std_msgs.msg import UInt16, Header, String
 from geometry_msgs.msg import Vector3Stamped, Vector3
 
-import tf
-
+########## CALIBRATION SWITCH VAR
+CALIBRATE = False
 USE_TRACKBARS = False
+
+
+
 #DEPTH_K0 = 0.003
 DEPTH_K0 = 0.000005
 XY_K0 = 0.0008
@@ -37,13 +34,13 @@ class Baxter:
         self.arm_obj = baxter_interface.limb.Limb(arm)
                 
         self.gripper = baxter_interface.Gripper(arm)
-        #self.gripper.calibrate()
+        #self.gripper.calibrate() ###################### GRIPPER CALIBRATE, DO WE NEED THIS?
 
         self.interface = baxter_interface.RobotEnable(CHECK_VERSION)
         self._init_state = self.interface.state().enabled
         self.interface.enable()
         
-        #self.gripper.open()
+        #self.gripper.open() ########################### GRIPPER OPEN, DO WE NEED THIS?
 
     def grip_ball(self):
         self.gripper.close()
@@ -91,6 +88,13 @@ class Planner:
         ## Check phase
         #phase = self.game.get_current_phase() ######### UNCOMMENT FOR COMPETITION
         phase = Game.PHASE_II ###############333######## SET GAME STATE HERE FOR DEBUG ####################
+        
+        while CALIBRATE:
+            raw_input('Press Enter to see joint angles...')
+            print self.motion_controller._arm_obj.joint_angles()
+            raw_input('Press Enter to see gripper z coordinate...')
+            print self.motion_controller.get_gripper_coords()[2]
+            rospy.sleep(0.5)
         
         while (phase == Game.PHASE_I or phase == Game.NOT_RUNNING) and not rospy.is_shutdown():
             # nothing happens (wait for phase 2)
@@ -144,11 +148,7 @@ class Planner:
             self.defense_coords = self.enter_defense_mode()
 
     def defend(self):
-        #pass
-        raw_input('Press Enter to see joint angles...')
-        print self.motion_controller._arm_obj.joint_angles()
-        #raw_input('Press Enter to see gripper z coordinate...')
-        #print self.motion_controller.get_gripper_coords()[2]
+        pass
         #self.defense_visual_servo()
 
     def enter_attack_mode(self):
