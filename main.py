@@ -37,17 +37,17 @@ class Baxter:
         self.arm_obj = baxter_interface.limb.Limb(arm)
                 
         self.gripper = baxter_interface.Gripper(arm)
-        self.gripper.calibrate()
+        #self.gripper.calibrate()
 
         self.interface = baxter_interface.RobotEnable(CHECK_VERSION)
         self._init_state = self.interface.state().enabled
         self.interface.enable()
         
-        self.gripper.open()
-
+        #self.gripper.open()
 
     def grip_ball(self):
         self.gripper.close()
+        
         
 class Planner:
 
@@ -56,23 +56,29 @@ class Planner:
 
     BALL_Z = -0.077#-0.07837517
 
-    ATTACK_POS = {'right_s0': -0.4893398707763672, 'right_s1': -0.03298058690185547, 'right_w0': -1.6582332298095703, 'right_w1': 1.4089613520629884, 'right_w2': -1.2168302585998536, 'right_e0': 1.440024462982178, 'right_e1': 1.6118303110290528}
+    ATTACK_POS_RIGHT_CONST = {'right_s0': -0.4893398707763672, 'right_s1': -0.03298058690185547, 'right_w0': -1.6582332298095703, 'right_w1': 1.4089613520629884, 'right_w2': -1.2168302585998536, 'right_e0': 1.440024462982178, 'right_e1': 1.6118303110290528}
     
-    DEFENSE_POS = {'right_s0': -0.7378447581298828, 'right_s1': 0.2573252768737793, 'right_w0': -1.9105730691284182, 'right_w1': 1.2954467738891602, 'right_w2': -1.3115535721435547, 'right_e0': 1.3337962935424805, 'right_e1': 1.6463448787170412}
+    DEFENSE_POS_RIGHT_CONST = {'right_s0': -0.7378447581298828, 'right_s1': 0.2573252768737793, 'right_w0': -1.9105730691284182, 'right_w1': 1.2954467738891602, 'right_w2': -1.3115535721435547, 'right_e0': 1.3337962935424805, 'right_e1': 1.6463448787170412}
+
+    ATTACK_POS_LEFT_CONST = {'left_w0': 1.0711020839172365, 'left_w1': 1.1731118061950685, 'left_w2': 1.2417574463745118, 'left_e0': -1.2068593834899903, 'left_e1': 1.6494128402893067, 'left_s0': 0.40688840352172856, 'left_s1': -0.4774515196838379}
+
+    DEFENSE_POS_LEFT_CONST = {'left_w0': 0.9802137223388673, 'left_w1': 0.8199127301879884, 'left_w2': 1.5995584647399903, 'left_e0': -0.7113835895690919, 'left_e1': 1.389403097039795, 'left_s0': 0.2695971231628418, 'left_s1': -0.2949078061340332}
 
     # max and min correspond to goal bounds as percentages of the board width
-    MAX_BOARD_WIDTH = 0.73
-    MIN_BOARD_WIDTH = 0.27
+    MAX_GOAL_WIDTH = 0.73
+    MIN_GOAL_WIDTH = 0.27
     
     def __init__(self, game, camera, motion_controller):
         self.camera = camera
         self.motion_controller = motion_controller
 
-        self.tl = tf.TransformListener()
+        self.arm = game.get_arm()
 
+        self.tl = tf.TransformListener()
+        self.ball_rel_x = 0
+        self.ball_rel_y = 0
         self.current_mode = Planner.DEFENSE_MODE
         rospy.Subscriber("/bigredrobot/overhead_camera", OverheadCamera, self.overhead_camera_callback)
-
     
     def run(self):
         arm = self.motion_controller._arm_obj
@@ -80,31 +86,31 @@ class Planner:
         window_name = 'Wrist Camera'
         cv.namedWindow(window_name)
         
+        stack_pub = rospy.Publisher('/bigredrobot/command', String)
+        
         ## Check phase
-        #phase = self.game.get_current_phase()
-        phase = Game.PHASE_III
-        if phase == Game.PHASE_I or phase == Game.NOT_RUNNING:
+        #phase = self.game.get_current_phase() ######### UNCOMMENT FOR COMPETITION
+        phase = Game.PHASE_II ###############333######## SET GAME STATE HERE FOR DEBUG ####################
+        
+        while (phase == Game.PHASE_I or phase == Game.NOT_RUNNING) and not rospy.is_shutdown():
             # nothing happens (wait for phase 2)
-            pass 
+            phase = self.game.get_current_phase()
+            rospy.sleep(0.5)
             
-        elif phase == Game.PHASE_II:     
+        while phase == Game.PHASE_II and not rospy.is_shutdown():     
             ## Stack blocks
+            phase = self.game.get_current_phase()
     
             stack_pub = rospy.Publisher('/bigredrobot/command', String)
             stack_pub.publish("scatter")
-            
-            # # Maybe check time remaining? Otherwise just go until
-            #remaining_time = game.get_remaining_time() # duration
-            #state_update_time = game.get_update_time() # time
-            #while rospy.Time.now()
-            #    pass
-                
-        elif phase == Game.PHASE_III:
+            rospy.sleep(0.5)
+           
+        if phase == Game.PHASE_III:     
             # Stop stacking blocks    
-            #stack_pub.publish("stop")
+            stack_pub.publish("stop")
         
             # Start offense/defenSe
-            self.enter_defense_mode()
+            self.defense_coords = self.enter_defense_mode()
             #self.enter_attack_mode()
             print 'Press <esc> to toggle modes'
             while not rospy.is_shutdown():
@@ -112,40 +118,50 @@ class Planner:
                 
                 cv.imshow(window_name, self.raw)
                 self.frame = cv.cvtColor(self.raw,cv.COLOR_BGR2HSV)
-                #self.overhead_frame = overhead_camera.get_frame()
-                k = cv.waitKey(5)
+                cv.waitKey(5)
+                
                 if self.current_mode == Planner.DEFENSE_MODE:
                     self.defend()
-                    if k == 27:
-                        self.enter_attack_mode()
+                    self.check_mode()
                 else:
                     self.attack(camera)
-                    if k == 27:
-                        self.enter_defense_mode()                
     
+    # Check if we should switch to attack from defense
+    def check_mode(self):
+        threshold = 0.01
+        if self.ball_found:
+            if self.arm == 'right':
+                if self.ball_rel_y > 0.5 and self.ball_abs_diff < threshold:
+                    self.enter_attack_mode()
+            else:
+                if self.ball_rel_y < 0.5 and self.ball_abs_diff < threshold:
+                    self.enter_attack_mode()
+            
     ######## ATTACK AND DEFEND FUNCTIONS #############
     def attack(self, camera):
         if self.get_ball(camera):
             self.motion_controller.throw()
-            self.enter_defense_mode()
+            self.defense_coords = self.enter_defense_mode()
 
     def defend(self):
         #pass
-        #raw_input('Press Enter to see joint angles...')
-        #print self.motion_controller._arm_obj.joint_angles()
+        raw_input('Press Enter to see joint angles...')
+        print self.motion_controller._arm_obj.joint_angles()
         #raw_input('Press Enter to see gripper z coordinate...')
         #print self.motion_controller.get_gripper_coords()[2]
-        self.defense_visual_servo()
+        #self.defense_visual_servo()
 
     def enter_attack_mode(self):
         print 'Entering Attack Mode'
         self.current_mode = Planner.ATTACK_MODE
-        self.motion_controller.set_joint_positions(Planner.ATTACK_POS)
+        self.motion_controller.set_joint_positions(self.ATTACK_POS)
 
     def enter_defense_mode(self):
         print 'Entering Defense Mode'
         self.current_mode = Planner.DEFENSE_MODE
-        self.motion_controller.set_joint_positions(Planner.DEFENSE_POS)
+        #self.motion_controller.set_joint_positions(self.DEFENSE_POS)
+        # Return gripper coordinates
+        return self.motion_controller.get_gripper_coords()
 
     ######## VISUAL SERVO FUNCTIONS #############
     def attack_visual_servo(self):
@@ -188,21 +204,23 @@ class Planner:
         return False
 
     def defense_visual_servo(self):
-        current_ball_rel_pos = self.ball_rel_pos
-        if current_ball_rel_pos < 0:
+        current_ball_rel_pos = self.ball_rel_x
+        if self.ball_found == False:
             #If we cannot see the ball, stop movement
             motion_controller.command_velocity(np.zeros(6))
+            rospy.logwarn('I am doing nothing')
             return False
         # These two lines limit ball_rel_pos to be between the goal posts
-        current_ball_rel_pos = min(Planner.MAX_BOARD_WIDTH, current_ball_rel_pos)
-        current_ball_rel_pos = max(Planner.MIN_BOARD_WIDTH, current_ball_rel_pos)
+        current_ball_rel_pos = min(Planner.MAX_GOAL_WIDTH, current_ball_rel_pos)
+        current_ball_rel_pos = max(Planner.MIN_GOAL_WIDTH, current_ball_rel_pos)
 
         ball_pos = current_ball_rel_pos*(BOARD_MAX_X - BOARD_MIN_X) + BOARD_MIN_X
-        hand_pos = self.motion_controller.get_gripper_coords()[0]
+        hand_pos = np.asarray(self.motion_controller.get_gripper_coords()).squeeze()
 
-        x_vel = DEFENSE_K0*(ball_pos - hand_pos)
-        print 'x_vel', x_vel
-        squiggle = np.array([x_vel,0,0,0,0,0])
+        target = np.array([ball_pos, self.defense_coords[1,0], self.defense_coords[2,0]])
+        vel = DEFENSE_K0*(target - hand_pos)
+        print 'vel: ', vel
+        squiggle = np.array([vel[0],vel[1],vel[2],0,0,0])
 
         try:
             motion_controller.command_velocity(squiggle)
@@ -212,13 +230,38 @@ class Planner:
         return False
 
     def overhead_camera_callback(self, data):
-        self.ball_x = data.ball_x
-        self.ball_y = data.ball_y
         # Get the current position of the ball relative to the width of the board
         # This thing is a percentage of the width
-        self.ball_rel_pos = ((float(data.center_y)+float(data.height/2)) - data.ball_y)/float(data.height) 
-        #print self.ball_rel_pos
+        # Baxter's x and y, not the camera's
+        if data.ball_x == -1 or data.ball_y == -1:
+            self.ball_found = False
+        else:    
+            self.ball_found = True
+            # (0,0) in rel coords is bottom left in kinect frame
+            new_ball_rel_x = ((float(data.center_y)+float(data.height/2)) - data.ball_y)/float(data.height) 
+            new_ball_rel_y = 1 - ((float(data.center_x)+float(data.width/2)) - data.ball_x)/float(data.width) 
+            
+            self.ball_abs_diff = sqrt((new_ball_rel_x - self.ball_rel_x)**2 + (new_ball_rel_y - self.ball_rel_y)**2)
+            
+            self.ball_rel_x = new_ball_rel_x
+            self.ball_rel_y = new_ball_rel_y
+            
+        print 'ball_rel_pos:', self.ball_rel_x, self.ball_rel_y
 
+    ############## GETTERS
+    @property
+    def ATTACK_POS(self):
+        if self.arm == 'right':
+            return Planner.ATTACK_POS_RIGHT_CONST
+        else:
+            return Planner.ATTACK_POS_LEFT_CONST
+                       
+    @property
+    def DEFENSE_POS(self):
+        if self.arm == 'right':
+            return Planner.DEFENSE_POS_RIGHT_CONST
+        else:
+            return Planner.DEFENSE_POS_LEFT_CONST
 
     #TODO: Clean up this huge function
     def get_ball(self, camera):
@@ -326,8 +369,6 @@ def debug_with_trackbars():
             break
         
     cv.destroyAllWindows()
-    
-    
     
 
 if __name__=="__main__":

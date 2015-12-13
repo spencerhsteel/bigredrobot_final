@@ -1,6 +1,6 @@
 <launch>
-      <node pkg="bigredrobot_final" type="main.py" />
-      <node pkg="bigredrobot_final" type="robot_interface.py" />
-      <node pkg="bigredrobot_final" type="block_stack.py" />
-      <node pkg="bigredrobot_final" type="overhead_camera.py" />
+      <node name="brr_main" pkg="bigredrobot_final" type="main.py" />
+      <node name="brr_robot_interface" pkg="bigredrobot_final" type="robot_interface.py" />
+      <node name="brr_block_stacker" pkg="bigredrobot_final" type="block_stack.py" />
+      <node name="brr_overhead_camera" pkg="bigredrobot_final" type="overhead_camera.py" />
 </launch>

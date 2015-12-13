@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-
-
 import rospy
 from bigredrobot_final.srv import *
 from bigredrobot_final.msg import *
@@ -22,12 +20,12 @@ import baxter_interface
 
 class RobotInterface:
     '''
-	Create a node to handle MoveRobot service calls RobotInterface and move baxter accordingly.
-	Start before BlockStackController intialisation.
-	
-	Stop node / finish stacking by sending a DONE action via MoveRobot srv call
-	
-	'''
+    Create a node to handle MoveRobot service calls RobotInterface and move baxter accordingly.
+    Start before BlockStackController intialisation.
+    
+    Stop node / finish stacking by sending a DONE action via MoveRobot srv call
+    
+    '''
     def __init__(self, arm):        
         rospy.init_node("robot_interface", anonymous=True)
 
@@ -37,6 +35,7 @@ class RobotInterface:
         self.limb = baxter_interface.Limb(arm) 
         self.gripper = baxter_interface.Gripper(arm)
         self.gripper.open()
+        self.arm = arm
         
         self.TABLE_Z = -0.08
         self.BLOCK_HEIGHT = 0.045
@@ -68,28 +67,27 @@ class RobotInterface:
             self.gripper_closed = True  
            
 
-        # augment world state with coordinates #### CHANGE FOR COMPETITION
+        # augment world state with coordinates
         pose = self.limb.endpoint_pose()
         pos = pose.popitem()[1]
         rospy.logwarn(pos)
-        self.base_x = pos.x # All block stacks lie on the same x position
+        self.base_x = pos.y - 0.3 if self.arm=='left' else pos.y + 0.3 # All block stacks lie on the same x position
         self.base_y = {i:0 for i in range(-self.num_blocks,1)} 
         self.base_z = pos.z - self.num_blocks*self.BLOCK_HEIGHT # Find z corresponding to base block
         self.block_coords = {i:[0, 0, 0] for i in range(-self.num_blocks,self.num_blocks+1)} # [x,y,z]
         for i in self.base_y:
-            if i % 2 == 1:
-                self.base_y[i] = pos.y + 1.5*(2*i*self.BLOCK_HEIGHT - (i+1)*self.BLOCK_HEIGHT)
-            else:
-                self.base_y[i] = pos.y - 1.5*i*self.BLOCK_HEIGHT
-            self.block_coords[i] = [self.base_x, self.base_y[i], self.base_z]
-        rospy.logwarn(self.base_y)
-        rospy.logwarn('base x = %f, base y[0] = %f' %(self.base_x, self.base_y[0]))
+            self.base_y[i] = pos.x + 2.2*i*self.BLOCK_HEIGHT
+            self.block_coords[i] = [self.base_x, self.base_y[i], self.base_z] 
         nextblock = self.gripper_at
         nextz = pos.z
         while nextblock > 0:
             self.block_coords[nextblock] = [self.base_x, self.base_y[0], nextz]
             nextz = nextz - self.BLOCK_HEIGHT
             nextblock = self.blocks_over[nextblock-1]
+            
+        for block, coord in self.block_coords.copy().iteritems()
+            self.block_coords[block] = [coord[1], coord[0], coord[2]]
+            
         self.ORIENT = pose.popitem()[1]
             
 
@@ -129,7 +127,7 @@ class RobotInterface:
         elif req.action==req.ACTION_IDLE:
             pass # nothing to see here
         elif req.action==req.DONE_STACKING:
-        	self.is_done = True
+            self.is_done = True
         return False
 
 
@@ -164,14 +162,14 @@ class RobotInterface:
             self.block_coords[self.gripper_at] = [x1, y1, z1]
     
     def move_safely(self,x0,y0,z0,x1,y1,z1):
-	    # Move safely between source and destination coords by moving vertically above maximum stack height first then moving horizontally, followed by a final vertical move to the destination z coord
+        # Move safely between source and destination coords by moving vertically above maximum stack height first then moving horizontally, followed by a final vertical move to the destination z coord
             self.move_robot(x0, y0, self.base_z + (self.num_blocks+1.5)*self.BLOCK_HEIGHT)
             self.move_robot(x1, y1, self.base_z + (self.num_blocks+1.5)*self.BLOCK_HEIGHT)
             self.move_robot(x1, y1, z1)
 
 
     def move_robot(self, x, y, z):
-	    # Command arm to move to coordinates x,y,z
+        # Command arm to move to coordinates x,y,z
         loc = Point(float(x),float(y),float(z))
         hdr = Header(stamp=rospy.Time.now(), frame_id='/base')
         ikreq = SolvePositionIKRequest()
@@ -195,8 +193,8 @@ class RobotInterface:
         rospy.Service('/bigredrobot/move_robot', MoveRobot, self.handle_move_robot) 
     
     def run(self):
-   		self.done = False
-		rospy.logwarn("Ready to receive commands")
+        self.done = False
+        rospy.logwarn("Ready to receive commands")
         rate = rospy.Rate(1) # Update state 1hz
         while not self.is_done and not rospy.is_shutdown():
             state = State()
@@ -210,8 +208,9 @@ class RobotInterface:
 if __name__ == '__main__':
     try:
         rospy.wait_for_service('/bigredrobot/arm')
-        get_arm_bool = rospy.ServiceProxy('/bigredrobot/arm')
-        if get_arm_bool() is True:
+        get_arm_bool = rospy.ServiceProxy('/bigredrobot/arm', Trigger)
+        resp = get_arm_bool()
+        if resp.success is True:
             arm = 'right'
         else:
             arm = 'left'

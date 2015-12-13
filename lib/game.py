@@ -7,7 +7,7 @@ from game_server.srv import Init
 from game_server.msg import GameState
 import rospkg
 
-from std_srvs.srv import Trigger, TriggerResponse
+from bigredrobot_final.srv import Trigger, TriggerResponse
 
 class Game:
     '''
@@ -22,6 +22,7 @@ class Game:
 
 
     def __init__(self):
+        print "initialising game"
         bridge = CvBridge()
         
         self.current_phase = Game.PHASE_I
@@ -37,17 +38,26 @@ class Game:
         #logo[:,150:300] = (0,255,0) # dummy logo
 
         rospack = rospkg.RosPack()
-        path = rospack.get_path('bigredrobot_final'1)
-        logo = cv.imread(path+'lib/logo.png',cv.IMREAD_COLOR)
+        path = rospack.get_path('bigredrobot_final')
+        #raise ValueError(path+'/lib/logo.png')
+        logo = cv.imread(path + '/lib/logo.png', cv.IMREAD_COLOR)
+        if np.random.random(1) < 0.5:
+            logo = cv.flip(logo,1)
+        if np.random.random(1) < 0.5:
+            logo = cv.flip(logo,0)
+            
+        
         
         # Convert to imgmsg
         logo_msg = bridge.cv2_to_imgmsg(logo, encoding="bgr8")
 
         # Call init service of game_server and get arm
-        #init = rospy.ServiceProxy('/game_server/init', Init)
-        #response = init("bigredrobot", logo_msg)
-        #self.arm = response.arm
-        self.arm = 'right'
+        ''' #################################################UNCOMMENT FOR COMPETITION ######################
+        init = rospy.ServiceProxy('/game_server/init', Init)
+        response = init("bigredrobot", logo_msg)
+        self.arm = response.arm
+        '''
+        self.arm = 'right' ########################################CCCCHHHHHHHHHAAAAAAAAAAANNNNNNGGGEEEEEEE##############
 
         # Subscribe to game_state updates
         #rospy.Subscriber('/game_server/game_state', GameState, self.game_state_callback) #### UNCOMMENT IN REAL CODE
@@ -59,8 +69,8 @@ class Game:
     def get_arm(self):
         return self.arm
 
-    def arm_callback(self, req)
-        return TriggerRespone(True if self.arm=='right' else False)
+    def arm_callback(self, req):
+        return TriggerResponse(success=True if self.arm=='right' else False, message="booooo")
 
     def get_current_phase(self):
         return self.current_phase # 0, 1, 2, or 3 (0 indicates game not running)

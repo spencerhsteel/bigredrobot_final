@@ -22,7 +22,8 @@ class BaxterMotionController:
     K0 = 0                # Gain for the secondary objective function
 
     RIGHT_THROW_START_ANGLES = {'right_s0': -0.6316165886901856, 'right_s1': 0.1967330358215332, 'right_w0': -1.8871798621398927, 'right_w1': 1.553539041156006, 'right_w2': -1.5681118586242677, 'right_e0': 1.7264953747924805, 'right_e1': 1.3625584332824707}
-    #LEFT_THROW_START_ANGLES = 
+    LEFT_THROW_START_ANGLES = {'left_w0': 1.251728321484375, 'left_w1': 1.392854553808594, 'left_w2': 1.920160449041748, 'left_e0': -1.3445341590454103, 'left_e1': 1.062665189593506, 'left_s0': 0.5330583231811524, 'left_s1': -0.24697090656738283}
+
 
 
     def __init__(self, baxter, arm):
@@ -113,7 +114,8 @@ class BaxterMotionController:
 
     def get_b(self, k):
         '''
-        Secondary objective function, designed to avoid joint limits
+        Secondary objective function, designed to avoid joint{'left_w0': 1.7391507162780764, 'left_w1': 1.2371555040161133, 'left_w2': 1.499082723248291, 'left_e0': -1.3330293031494143, 'left_e1': 1.3372477503112794, 'left_s0': 0.5326748279846192, 'left_s1': 0.20248546376953128}
+ limits
         https://books.google.com/books?id=nyrY0Pu5kl0C&pg=PA128&dq=jacobian+secondary+objective+function&hl=en&sa=X&ved=0ahUKEwiqscikhM_JAhVljIMKHZZ7CYQQ6AEIHDAA#v=onepage&q=jacobian%20secondary%20objective%20function&f=false
         '''
         joint_angles = self._arm_obj.joint_angles()
