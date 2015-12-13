@@ -26,13 +26,27 @@ class BlockStackController():
         rospy.init_node("block_stack_controller", anonymous=True)
         self.command = None        
         self.is_done = False
+    
+    def init_subscribers(self):
+        rospy.Subscriber("/bigredrobot/state", State, self.state_update)
+        rospy.Subscriber("/bigredrobot/command", String, self.command_update)
+
+    def run(self):
+        rospy.wait_for_service('/bigredrobot/move_robot')
+        self.move_robot = rospy.ServiceProxy('/bigredrobot/move_robot', MoveRobot)
+        try:
+            while not self.is_done and not rospy.is_shutdown():                
+                if self.command :
+                    self.control()
+        except Exception as ex:
+            rospy.logwarn(ex) # stop node
+
 
     def state_update(self, state):
         self.blocks_over = state.blocks_over
         self.gripper_at = state.gripper_at
         self.gripper_closed = state.gripper_closed
         self.state_updated = True
-
 
     def command_update(self, command):
         self.command = command.data
@@ -46,17 +60,11 @@ class BlockStackController():
             # Stop stacking
             self.is_done = True # this will prevent any further service calls from happening
             
-
-    def init_subscribers(self):
-        rospy.Subscriber("/bigredrobot/state", State, self.state_update)
-        rospy.Subscriber("/bigredrobot/command", String, self.command_update)
-
     def is_scattered(self):
         if all([x <= 0 for x in self.blocks_over]):
             return True
         else:
             return False    
-
 
     def is_stacked_ascending(self):
         if self.blocks_over[0] > 0:
@@ -66,7 +74,6 @@ class BlockStackController():
                 return False
         return True
         
-
     def is_stacked_descending(self):
         if self.blocks_over[-1] > 0:
             return False
@@ -74,7 +81,6 @@ class BlockStackController():
             if self.blocks_over[i] != i + 2:
                 return False
         return True
-
 
     def make_available(self, target):
         rospy.loginfo('Make %i available, States: %s' %(target, str(self.blocks_over)))
@@ -90,13 +96,11 @@ class BlockStackController():
         else:
             rospy.loginfo('Block %i is available, States: %s' %(target, str(self.blocks_over)))
         
-
     def is_available(self, target):
         if target not in self.blocks_over:
             return True
         else:
             return False
-
 
     def control_stack_ascending(self):    
         for i in range(1, len(self.blocks_over) + 1):
@@ -104,18 +108,15 @@ class BlockStackController():
             destination = -i if i == 1 else i - 1
             self.move(i, destination)
 
-
     def control_stack_descending(self):
         for i in reversed(range(1, len(self.blocks_over) + 1)):
             self.make_available(i)
             destination = -i if i == len(self.blocks_over) else i + 1
             self.move(i, destination)
 
-
     def control_scatter(self):
         for i in range(len(self.blocks_over)):
             self.make_available(i+1)
-
 
     def control_stack_odd_even(self):
         #For now, stack in any order, but create two separate odd/even stacks
@@ -124,11 +125,9 @@ class BlockStackController():
         if self.is_stacked_descending():
             for i in range(1, len(self.blocks_over) + 1):
                 top_left, top_right = self.split_stack(i, top_left, top_right)
-
         elif self.is_stacked_ascending():
             for i in reversed(range(1, len(self.blocks_over) + 1)):
                 top_left, top_right = self.split_stack(i, top_left, top_right)
-
         elif self.is_scattered():
             pass
 
@@ -168,7 +167,6 @@ class BlockStackController():
             # Block until state is updated, as this controller requires most recent state from interface
             pass        
 
-
     def control(self):
         if self.command == "scatter":
             self.control_scatter()
@@ -182,16 +180,6 @@ class BlockStackController():
             rospy.logwarn('You suck at typing. invalid name, try again.')
         self.command = None
 
-
-    def run(self):
-        rospy.wait_for_service('/bigredrobot/move_robot')
-        self.move_robot = rospy.ServiceProxy('/bigredrobot/move_robot', MoveRobot)
-        try:        
-            while not self.is_done and not rospy.is_shutdown():     
-                if self.command :
-                    self.control()
-        except Exception as ex:
-            rospy.logwarn(ex) # stop node
 
 
 if __name__ == '__main__':

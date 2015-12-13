@@ -73,7 +73,6 @@ class RobotInterface:
             self.gripper_at = 1
             self.gripper_closed = True  
            
-
         # augment world state with coordinates
         pose = self.limb.endpoint_pose()
         pos = pose.popitem()[1]
@@ -92,7 +91,8 @@ class RobotInterface:
             nextz = nextz - self.BLOCK_HEIGHT
             nextblock = self.blocks_over[nextblock-1]
             
-        for block, coord in self.block_coords.copy().iteritems():
+        for block in self.block_coords:
+            coord = self.block_coords[block]
             self.block_coords[block] = [coord[1], coord[0], coord[2]]
             
         self.ORIENT = pose.popitem()[1]
@@ -100,6 +100,9 @@ class RobotInterface:
 
     def init_publisher(self):
         self.pub = rospy.Publisher('/bigredrobot/state', State, queue_size=10)
+
+    def init_service(self):
+        rospy.Service('/bigredrobot/move_robot', MoveRobot, self.handle_move_robot) 
 
     # Callback function for move_robot server
     def handle_move_robot(self, req):    
@@ -137,13 +140,11 @@ class RobotInterface:
             self.is_done = True
         return False
 
-
 # Real robot move functions.
 # Send commands to baxter 
 # Must be called before symbolic state update        
     def robot_open_gripper(self):
         self.gripper.open(block=True)
-
 
     def robot_close_gripper(self):
         self.gripper.close(block=True)
@@ -159,7 +160,6 @@ class RobotInterface:
         x1, y1, z1 = self.block_coords[target]  
         self.move_safely(x0,y0,z0,x1,y1,z1)
 
-
     def robot_move_over(self, target):
             rospy.logwarn('move over target = %i' %(target)  )    
             x0, y0, z0 = self.get_gripper_coords()      
@@ -173,7 +173,6 @@ class RobotInterface:
             self.move_robot(x0, y0, self.base_z + (self.num_blocks+1.5)*self.BLOCK_HEIGHT)
             self.move_robot(x1, y1, self.base_z + (self.num_blocks+1.5)*self.BLOCK_HEIGHT)
             self.move_robot(x1, y1, z1)
-
 
     def move_robot(self, x, y, z):
         # Command arm to move to coordinates x,y,z
@@ -195,10 +194,6 @@ class RobotInterface:
         limb_joints = dict(zip(resp.joints[0].name, resp.joints[0].position))
         self.limb.move_to_joint_positions(limb_joints)
             
-
-    def init_service(self):
-        rospy.Service('/bigredrobot/move_robot', MoveRobot, self.handle_move_robot) 
-    
     def run(self):
         self.done = False
         rospy.logwarn("Ready to receive commands")
@@ -211,7 +206,6 @@ class RobotInterface:
             self.pub.publish(state)
             rate.sleep()
     
-
 if __name__ == '__main__':
     try:
         rospy.wait_for_service('/bigredrobot/arm')

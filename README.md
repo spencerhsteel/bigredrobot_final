@@ -5,6 +5,7 @@ Things to test:
     - Switching between modes
     - Defense visual servo
     - Make throwing on target / faster / better
+    - Left arm stuff
     
 Things to calibrate:
     - Overhead camera arena bounds
