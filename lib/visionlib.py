@@ -183,7 +183,7 @@ def locate_pink_ball(frame):
     
     #mask_pink = cv.bitwise_or(mask_pink1, mask_pink2)
     
-    return track_object(mask_pink1)
+    return track_object(mask_pink)
     
 
 if __name__=="__main__":

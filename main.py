@@ -18,14 +18,13 @@ CALIBRATE = False
 USE_TRACKBARS = False
 
 
-
 #DEPTH_K0 = 0.003
 DEPTH_K0 = 0.000005
 XY_K0 = 0.0008
-DEFENSE_K0 = 0.8
+DEFENSE_K0 = 2
 
-BOARD_MAX_X = 1.0
-BOARD_MIN_X = 0.1
+BOARD_MAX_X = 0.97
+BOARD_MIN_X = 0.18
 
 class Baxter:
     def __init__(self, arm):
@@ -44,6 +43,12 @@ class Baxter:
 
     def grip_ball(self):
         self.gripper.close()
+
+    def open_gripper(self):
+        self.gripper.close()
+    
+    def set_gripper(self):
+        self.gripper.command_position(50)
         
         
 class Planner:
@@ -62,8 +67,8 @@ class Planner:
     DEFENSE_POS_LEFT_CONST = {'left_w0': 0.9802137223388673, 'left_w1': 0.8199127301879884, 'left_w2': 1.5995584647399903, 'left_e0': -0.7113835895690919, 'left_e1': 1.389403097039795, 'left_s0': 0.2695971231628418, 'left_s1': -0.2949078061340332}
 
     # max and min correspond to goal bounds as percentages of the board width
-    MAX_GOAL_WIDTH = 0.73
-    MIN_GOAL_WIDTH = 0.27
+    MAX_GOAL_WIDTH = 0.68
+    MIN_GOAL_WIDTH = 0.3
     
     def __init__(self, game, camera, motion_controller):
         self.camera = camera
@@ -77,6 +82,8 @@ class Planner:
         self.ball_rel_y = 0
         self.current_mode = Planner.DEFENSE_MODE
         rospy.Subscriber("/bigredrobot/overhead_camera", OverheadCamera, self.overhead_camera_callback)
+
+        
     
     def run(self):
         arm = self.motion_controller._arm_obj
@@ -87,15 +94,13 @@ class Planner:
         stack_pub = rospy.Publisher('/bigredrobot/command', String, queue_size=10)
         
         ## Check phase
-        #phase = self.game.get_current_phase() ######### UNCOMMENT FOR COMPETITION
-        phase = Game.PHASE_II ###############333######## SET GAME STATE HERE FOR DEBUG ####################
+        #phase = self.game.get_current_phase() ######### UNCOMMENT FOR COMPETITION################################
+        phase = Game.PHASE_III ###############333######## SET GAME STATE HERE FOR DEBUG ####################
         
-        while CALIBRATE:
-            raw_input('Press Enter to see joint angles...')
-            print self.motion_controller._arm_obj.joint_angles()
-            raw_input('Press Enter to see gripper z coordinate...')
-            print self.motion_controller.get_gripper_coords()[2]
-            rospy.sleep(0.5)
+        while CALIBRATE and not rospy.is_shutdown():
+            rospy.logwarn(self.motion_controller._arm_obj.joint_angles())
+            rospy.logwarn(self.motion_controller.get_gripper_coords())
+            rospy.sleep(1)
         
         while (phase == Game.PHASE_I or phase == Game.NOT_RUNNING) and not rospy.is_shutdown():
             # nothing happens (wait for phase 2)
@@ -104,9 +109,8 @@ class Planner:
             
         while phase == Game.PHASE_II and not rospy.is_shutdown():     
             ## Stack blocks
-            rospy.logwarn('PHASE II')
-            #phase = self.game.get_current_phase()
-    
+            #phase = self.game.get_current_phase() #######################################UNCOMMENT~!!!!!!!!!!!!!!!!
+            
             stack_pub.publish("scatter")
             rospy.sleep(0.5)
            
@@ -114,6 +118,7 @@ class Planner:
             rospy.logwarn('PHASE III')   
             # Stop stacking blocks    
             stack_pub.publish("stop")
+            self.motion_controller.move_up(vel=0.1, dist=0.15)
         
             # Start offense/defenSe
             self.defense_coords = self.enter_defense_mode()
@@ -134,13 +139,14 @@ class Planner:
     
     # Check if we should switch to attack from defense
     def check_mode(self):
-        threshold = 0.01
+        threshold = 0.005
         if self.ball_found:
             if self.arm == 'right':
-                if self.ball_rel_y > 0.5 and self.ball_abs_diff < threshold:
+                if self.ball_rel_y > 0.6 and self.ball_abs_diff < threshold:
                     self.enter_attack_mode()
             else:
-                if self.ball_rel_y < 0.5 and self.ball_abs_diff < threshold:
+                if self.ball_rel_y < 0.4 and self.ball_abs_diff < threshold:
+                    rospy.logwarn('enter attack mode')                    
                     self.enter_attack_mode()
             
     ######## ATTACK AND DEFEND FUNCTIONS #############
@@ -150,8 +156,7 @@ class Planner:
             self.defense_coords = self.enter_defense_mode()
 
     def defend(self):
-        pass
-        #self.defense_visual_servo()
+        self.defense_visual_servo()
 
     def enter_attack_mode(self):
         print 'Entering Attack Mode'
@@ -161,7 +166,12 @@ class Planner:
     def enter_defense_mode(self):
         print 'Entering Defense Mode'
         self.current_mode = Planner.DEFENSE_MODE
-        #self.motion_controller.set_joint_positions(self.DEFENSE_POS)
+        self
+        self.motion_controller.set_joint_positions(self.ATTACK_POS)
+        self.motion_controller.set_joint_positions(self.DEFENSE_POS)
+        # start derivative control clock
+        self.old_time = rospy.get_time()
+        self.old_error = 0
         # Return gripper coordinates
         return self.motion_controller.get_gripper_coords()
 
@@ -199,7 +209,7 @@ class Planner:
             trans_vect = self.tl.transformVector3('/base', vect)
             squiggle = np.array([trans_vect.vector.x,trans_vect.vector.y,trans_vect.vector.z,0,0,0])
             print 'squiggle', squiggle
-            #motion_controller.command_velocity(squiggle)
+            motion_controller.command_velocity(squiggle)
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             print "you suck"
         
@@ -210,7 +220,6 @@ class Planner:
         if self.ball_found == False:
             #If we cannot see the ball, stop movement
             motion_controller.command_velocity(np.zeros(6))
-            rospy.logwarn('I am doing nothing')
             return False
         # These two lines limit ball_rel_pos to be between the goal posts
         current_ball_rel_pos = min(Planner.MAX_GOAL_WIDTH, current_ball_rel_pos)
@@ -220,7 +229,17 @@ class Planner:
         hand_pos = np.asarray(self.motion_controller.get_gripper_coords()).squeeze()
 
         target = np.array([ball_pos, self.defense_coords[1,0], self.defense_coords[2,0]])
-        vel = DEFENSE_K0*(target - hand_pos)
+        error = target - hand_pos
+        vel = DEFENSE_K0*(error)
+        # TEST TEST TEST TEST
+        # DERIVATIVE CONTROL :-|
+        DEFENSE_KD = 0.8
+        time = rospy.get_time()
+        derivative_term = DEFENSE_KD*(error - self.old_error)/(time - self.old_time)
+        vel = vel + derivative_term
+        # END TEST STUFF
+        self.old_error = error
+        self.old_time = time
         print 'vel: ', vel
         squiggle = np.array([vel[0],vel[1],vel[2],0,0,0])
 
@@ -243,7 +262,7 @@ class Planner:
             new_ball_rel_x = ((float(data.center_y)+float(data.height/2)) - data.ball_y)/float(data.height) 
             new_ball_rel_y = 1 - ((float(data.center_x)+float(data.width/2)) - data.ball_x)/float(data.width) 
             
-            self.ball_abs_diff = sqrt((new_ball_rel_x - self.ball_rel_x)**2 + (new_ball_rel_y - self.ball_rel_y)**2)
+            self.ball_abs_diff = np.sqrt((new_ball_rel_x - self.ball_rel_x)**2 + (new_ball_rel_y - self.ball_rel_y)**2)
             
             self.ball_rel_x = new_ball_rel_x
             self.ball_rel_y = new_ball_rel_y

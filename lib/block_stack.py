@@ -39,7 +39,7 @@ class BlockStackController():
                 if self.command :
                     self.control()
         except Exception as ex:
-            rospy.logwarn(ex) # stop node
+            rospy.logerr(ex) # stop node
 
 
     def state_update(self, state):
@@ -117,6 +117,7 @@ class BlockStackController():
     def control_scatter(self):
         for i in range(len(self.blocks_over)):
             self.make_available(i+1)
+        self.make_available(0)
 
     def control_stack_odd_even(self):
         #For now, stack in any order, but create two separate odd/even stacks
@@ -147,7 +148,7 @@ class BlockStackController():
         actions = [MoveRobotRequest.ACTION_OPEN_GRIPPER, MoveRobotRequest.ACTION_MOVE_TO,
                     MoveRobotRequest.ACTION_CLOSE_GRIPPER, MoveRobotRequest.ACTION_MOVE_OVER,
                     MoveRobotRequest.ACTION_OPEN_GRIPPER]
-        targets = [lgrip,lblocknum,lgrip,ltarget,lgrip]
+        targets = [target,blocknum,target,target,target]
         for action, target in zip(actions,targets):
             req = MoveRobotRequest()
             if target is None:

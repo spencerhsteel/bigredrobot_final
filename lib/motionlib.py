@@ -24,6 +24,8 @@ class BaxterMotionController:
     RIGHT_THROW_START_ANGLES = {'right_s0': -0.6316165886901856, 'right_s1': 0.1967330358215332, 'right_w0': -1.8871798621398927, 'right_w1': 1.553539041156006, 'right_w2': -1.5681118586242677, 'right_e0': 1.7264953747924805, 'right_e1': 1.3625584332824707}
     LEFT_THROW_START_ANGLES = {'left_w0': 1.251728321484375, 'left_w1': 1.392854553808594, 'left_w2': 1.920160449041748, 'left_e0': -1.3445341590454103, 'left_e1': 1.062665189593506, 'left_s0': 0.5330583231811524, 'left_s1': -0.24697090656738283}
 
+    # START ATTACK THROW
+    RIGHT_THROW_START_ANGLES = {'right_s0': -0.2791845030761719, 'right_s1': 0.15454856420288088, 'right_w0': -1.7878546062377931, 'right_w1': 1.4641846603637696, 'right_w2': 1.7491215913879397, 'right_e0': 1.6260196333007813, 'right_e1': 1.1217234498596191}
 
 
     def __init__(self, baxter, arm):
@@ -197,7 +199,7 @@ class BaxterMotionController:
     ########################################
     # Throwing functions
     ########################################
-    def throw(self, throw_vel=1, throw_dist=0.1):
+    def throw(self, throw_vel=2, throw_dist=0.2):
         if self.arm == 'right':
             start_angles = self.RIGHT_THROW_START_ANGLES
         else:
@@ -210,12 +212,22 @@ class BaxterMotionController:
         p_0 = np.asarray(self.get_gripper_coords().T).squeeze() # as np.array([x, y, z])
         delta_p_throw = np.array([0.05, throw_dist, 0]) # throw along the negative y for the right arm
         p_1 = p_0 + delta_p_throw
-        p_2 = p_1 + delta_p_throw*2 # move half as far again after release
+        p_2 = p_1 + delta_p_throw
         
         kp = self.KP*2
         self.follow_line_p_control(p_0, p_1, throw_vel, kp) ####INCREASED GAIN BY 1.5x
         self._gripper_obj.open() # bring the pain
         self.follow_line_p_control(p_1, p_2, throw_vel, kp)
+        
+
+    def move_up(self, vel, dist):
+
+        p_0 = np.asarray(self.get_gripper_coords().T).squeeze() 
+        delta_p_throw = np.array([0, 0, dist]) 
+        p_1 = p_0 + delta_p_throw
+        
+        self.follow_line_p_control(p_0, p_1, vel, self.KP) 
+        
         
         
                

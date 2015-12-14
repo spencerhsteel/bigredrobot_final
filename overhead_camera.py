@@ -46,10 +46,10 @@ def run(camera):
                 return
             
     else:
-        cx = 333
-        cy = 181
-        x = 50
-        y = 44
+        cx = 323
+        cy = 191
+        x = 40
+        y = 54
         w = 567
         h = 275
 
@@ -80,17 +80,17 @@ def run(camera):
             _, depth_thresh = cv.threshold(depth, 5, 255, cv.THRESH_BINARY)
             d = np.zeros_like(depth_thresh)
             y_offset = 20
-            x_offset_left = 20
+            x_offset_left = 30
             x_offset_right = 12
             mid = frame.shape[0]/2
             right_lim = frame.shape[0]/1.5
             d[y_offset:] = depth_thresh[:-y_offset]
             d[:,x_offset_left:mid] = d[:,:mid-x_offset_left]
             d[:,right_lim-x_offset_right:-x_offset_right] = d[:,right_lim:]
-            d = cv.dilate(d, np.ones((15,15)))
-            d = cv.erode(d, np.ones((15,15)))
-            frame = cv.dilate(frame, np.ones((5,5)))
-            frame = cv.erode(frame, np.ones((5,5)))
+            d = cv.dilate(d, np.ones((25,25)))
+            d = cv.erode(d, np.ones((25,15)))
+            #frame = cv.dilate(frame, np.ones((5,5)))
+            #frame = cv.erode(frame, np.ones((5,5)))
             frame = cv.bitwise_and(frame,frame,mask = d)
 
         #converting to HSV
@@ -116,8 +116,8 @@ def run(camera):
 
         gray = cv.cvtColor(display,cv.COLOR_BGR2GRAY)
 
-        lower_hsv_pink = np.array([140, 20, 100])
-        upper_hsv_pink = np.array([179, 250, 255])
+        lower_hsv_pink = np.array([150, 90, 100])
+        upper_hsv_pink = np.array([165, 220, 255])
         mask_pink = cv.inRange(hsv,lower_hsv_pink, upper_hsv_pink)
         pink_x, pink_y, mask_pink, _ = track_ball(mask_pink)        
 
@@ -176,8 +176,11 @@ def find_ROI(frame):
     return fieldCnt, fieldBox
 
 def track_ball(mask):
-    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE,(10,10))
+    morphed_mask = mask.copy()
+    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE,(5,5))
+    kernel_close = cv.getStructuringElement(cv.MORPH_ELLIPSE,(10,10))
     morphed_mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
+    morphed_mask = cv.morphologyEx(morphed_mask, cv.MORPH_CLOSE, kernel_close)
     contours, hierarchy = cv.findContours(morphed_mask.copy(), cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
     max_area = 0
     best_cnt = None
@@ -188,7 +191,7 @@ def track_ball(mask):
         max_area = area
         best_cnt = cnt
 
-    if best_cnt is None or max_area<50:
+    if best_cnt is None or max_area<20:
       x = -1
       y = -1
     else:     

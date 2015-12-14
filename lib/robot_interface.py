@@ -52,7 +52,7 @@ class RobotInterface:
 
             configuration = rospy.get_param('/configuration')
         else:
-            self.num_blocks = 5
+            self.num_blocks = 3
             configuration = 'stacked_ascending'
         num_blocks = self.num_blocks # We suck
 
@@ -64,10 +64,12 @@ class RobotInterface:
             self.blocks_over = list(range(-num_blocks+1,1)) # e.g [-2, -1, 0]
             self.gripper_at = num_blocks
         elif configuration=='stacked_ascending':
+            rospy.logwarn('stacked_ascending config')
             self.blocks_over = list(range(num_blocks)) # e.g [0, 1, 2]
             self.blocks_over[0] = 0
             self.gripper_at = num_blocks
         else :
+            rospy.logwarn('bad')
             self.blocks_over = list(range(2,num_blocks+1)) # e.g [2, 3, 0]
             self.blocks_over.append(0)
             self.gripper_at = 1
@@ -82,12 +84,16 @@ class RobotInterface:
         self.base_z = pos.z - self.num_blocks*self.BLOCK_HEIGHT # Find z corresponding to base block
         self.block_coords = {i:[0, 0, 0] for i in range(-self.num_blocks,self.num_blocks+1)} # [x,y,z]
         for i in self.base_y:
-            self.base_y[i] = pos.x + 2.2*i*self.BLOCK_HEIGHT
-            self.block_coords[i] = [self.base_x, self.base_y[i], self.base_z] 
+            if i == 0:
+                self.base_y[i] = pos.x
+                self.block_coords[i] = [pos.y, self.base_y[i], self.base_z]
+            else:
+                self.base_y[i] = pos.x - 2*i*self.BLOCK_HEIGHT
+                self.block_coords[i] = [self.base_x, self.base_y[i], self.base_z] 
         nextblock = self.gripper_at
         nextz = pos.z
         while nextblock > 0:
-            self.block_coords[nextblock] = [self.base_x, self.base_y[0], nextz]
+            self.block_coords[nextblock] = [pos.y, self.base_y[0], nextz]
             nextz = nextz - self.BLOCK_HEIGHT
             nextblock = self.blocks_over[nextblock-1]
             
@@ -96,6 +102,7 @@ class RobotInterface:
             self.block_coords[block] = [coord[1], coord[0], coord[2]]
             
         self.ORIENT = pose.popitem()[1]
+        rospy.logwarn('block_coords: ' + str(self.block_coords))
             
 
     def init_publisher(self):
@@ -150,7 +157,7 @@ class RobotInterface:
         self.gripper.close(block=True)
         
     def get_gripper_coords(self):
-        self.limb.endpoint_pose()
+        pose = self.limb.endpoint_pose()
         pos = pose.popitem()[1]
         return pos.x, pos.y, pos.z
 
@@ -205,6 +212,13 @@ class RobotInterface:
             state.gripper_closed = self.gripper_closed
             self.pub.publish(state)
             rate.sleep()
+
+
+    def is_topmost(self, target):
+        if target not in self.blocks_over:
+            return True
+        else:
+            return False
     
 if __name__ == '__main__':
     try:

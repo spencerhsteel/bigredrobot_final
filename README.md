@@ -16,4 +16,4 @@ SWITCHES:
     - game.py TEST_DEBUG = False
     - main.py CALIBRATE = False
     * robot\_interface.py USE_PARAMS = False
-    
+    - uncomment lines in main to actually check game phase from game instance

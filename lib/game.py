@@ -11,7 +11,7 @@ from bigredrobot_final.srv import Trigger, TriggerResponse
 
 
 TEST_DEBUG = True
-TEST_ARM = 'left'
+TEST_ARM = 'right'
 
 class Game:
     '''
@@ -23,7 +23,6 @@ class Game:
     PHASE_I = 1
     PHASE_II = 2
     PHASE_III = 3
-
 
     def __init__(self):
         bridge = CvBridge()
@@ -59,8 +58,7 @@ class Game:
         else:
             R = cv.getRotationMatrix2D((cols/2,rows/2),270,1)
         logo = cv.warpAffine(logo, R, (cols,rows))
-            
-        
+       
         
         # Convert to imgmsg
         logo_msg = bridge.cv2_to_imgmsg(logo, encoding="bgr8")
