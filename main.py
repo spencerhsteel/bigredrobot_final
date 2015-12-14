@@ -45,10 +45,10 @@ class Baxter:
         self.gripper.close()
 
     def open_gripper(self):
-        self.gripper.close()
+        self.gripper.open()
     
-    def set_gripper(self):
-        self.gripper.command_position(50)
+    def set_gripper(self, value):
+        self.gripper.command_position(value)
         
         
 class Planner:
@@ -161,12 +161,13 @@ class Planner:
     def enter_attack_mode(self):
         print 'Entering Attack Mode'
         self.current_mode = Planner.ATTACK_MODE
+        baxter.open_gripper()
         self.motion_controller.set_joint_positions(self.ATTACK_POS)
 
     def enter_defense_mode(self):
         print 'Entering Defense Mode'
         self.current_mode = Planner.DEFENSE_MODE
-        self
+        baxter.set_gripper(50)###################################### SET GRIPPER 1/2 OPEN???
         self.motion_controller.set_joint_positions(self.ATTACK_POS)
         self.motion_controller.set_joint_positions(self.DEFENSE_POS)
         # start derivative control clock
