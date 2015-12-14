@@ -209,8 +209,16 @@ class BaxterMotionController:
         # move to throw start position
         self._arm_obj.move_to_joint_positions(start_angles)
 
+
+        throw_lateral = 0.05
+
+        # RANDOM THINGS
+        rand_num = 2*(np.random.random() - 0.5)   # between -1, 1
+        variation_prop = 0.1 # vary +/- x percent
+        throw_variation = rand_num*(throw_lateral*variation_prop)
+
         p_0 = np.asarray(self.get_gripper_coords().T).squeeze() # as np.array([x, y, z])
-        delta_p_throw = np.array([0.05, throw_dist, 0]) # throw along the negative y for the right arm
+        delta_p_throw = np.array([throw_lateral+throw_variation, throw_dist, 0]) # throw along the negative y for the right arm
         p_1 = p_0 + delta_p_throw
         p_2 = p_1 + delta_p_throw
         

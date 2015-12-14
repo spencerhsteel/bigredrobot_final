@@ -94,12 +94,13 @@ class Planner:
         stack_pub = rospy.Publisher('/bigredrobot/command', String, queue_size=10)
         
         ## Check phase
-        #phase = self.game.get_current_phase() ######### UNCOMMENT FOR COMPETITION################################
-        phase = Game.PHASE_III ###############333######## SET GAME STATE HERE FOR DEBUG ####################
+        phase = self.game.get_current_phase() 
+        #phase = Game.PHASE_II ########################## SET GAME STATE HERE FOR DEBUG ####################
         
         while CALIBRATE and not rospy.is_shutdown():
             rospy.logwarn(self.motion_controller._arm_obj.joint_angles())
             rospy.logwarn(self.motion_controller.get_gripper_coords())
+            baxter.set_gripper(65)
             rospy.sleep(1)
         
         while (phase == Game.PHASE_I or phase == Game.NOT_RUNNING) and not rospy.is_shutdown():
@@ -109,7 +110,7 @@ class Planner:
             
         while phase == Game.PHASE_II and not rospy.is_shutdown():     
             ## Stack blocks
-            #phase = self.game.get_current_phase() #######################################UNCOMMENT~!!!!!!!!!!!!!!!!
+            phase = self.game.get_current_phase() 
             
             stack_pub.publish("scatter")
             rospy.sleep(0.5)
@@ -167,7 +168,7 @@ class Planner:
     def enter_defense_mode(self):
         print 'Entering Defense Mode'
         self.current_mode = Planner.DEFENSE_MODE
-        baxter.set_gripper(50)###################################### SET GRIPPER 1/2 OPEN???
+        baxter.set_gripper(65)###################################### SET GRIPPER 65% OPEN???
         self.motion_controller.set_joint_positions(self.ATTACK_POS)
         self.motion_controller.set_joint_positions(self.DEFENSE_POS)
         # start derivative control clock

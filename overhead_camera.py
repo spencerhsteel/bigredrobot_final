@@ -7,6 +7,7 @@ from bigredrobot_final.msg import *
 
 USE_TRACKBARS = False
 USE_DEPTHMASK = True
+USE_DEPTH_REGISTERED = False
 FIND_ROI = False
 
 def run(camera):
@@ -77,21 +78,21 @@ def run(camera):
 
         #create table mask
         if USE_DEPTHMASK:
-            _, depth_thresh = cv.threshold(depth, 5, 255, cv.THRESH_BINARY)
-            d = np.zeros_like(depth_thresh)
-            y_offset = 20
-            x_offset_left = 30
-            x_offset_right = 12
-            mid = frame.shape[0]/2
-            right_lim = frame.shape[0]/1.5
-            d[y_offset:] = depth_thresh[:-y_offset]
-            d[:,x_offset_left:mid] = d[:,:mid-x_offset_left]
-            d[:,right_lim-x_offset_right:-x_offset_right] = d[:,right_lim:]
-            d = cv.dilate(d, np.ones((25,25)))
-            d = cv.erode(d, np.ones((25,15)))
-            #frame = cv.dilate(frame, np.ones((5,5)))
-            #frame = cv.erode(frame, np.ones((5,5)))
-            frame = cv.bitwise_and(frame,frame,mask = d)
+            _, d = cv.threshold(depth, 5, 255, cv.THRESH_BINARY)
+            if not USE_DEPTH_REGISTERED:
+                y_offset = 20
+                x_offset_left = 30
+                x_offset_right = 12
+                mid = frame.shape[0]/2
+                right_lim = frame.shape[0]/1.5
+                d[y_offset:] = d[:-y_offset]
+                d[:,x_offset_left:mid] = d[:,:mid-x_offset_left]
+                d[:,right_lim-x_offset_right:-x_offset_right] = d[:,right_lim:]
+                d = cv.dilate(d, np.ones((25,25)))
+                d = cv.erode(d, np.ones((25,15)))
+            
+            # DO DEPTH MASKING
+            frame = cv.bitwise_and(frame, frame, mask=d)
 
         #converting to HSV
         hsv = cv.cvtColor(frame,cv.COLOR_BGR2HSV)
@@ -205,6 +206,6 @@ if __name__=="__main__":
     pub = rospy.Publisher('/bigredrobot/overhead_camera', OverheadCamera, queue_size = 10)
     rospy.init_node('overhead_camera', anonymous=True)
         
-    camera = vl.OverheadCamera()
+    camera = vl.OverheadCamera(USE_DEPTH_REGISTERED)
     run(camera)
 

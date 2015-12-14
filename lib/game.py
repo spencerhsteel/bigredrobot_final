@@ -10,7 +10,7 @@ import rospkg
 from bigredrobot_final.srv import Trigger, TriggerResponse
 
 
-TEST_DEBUG = True
+TEST_DEBUG = False
 TEST_ARM = 'right'
 
 class Game:
@@ -70,10 +70,10 @@ class Game:
             init = rospy.ServiceProxy('/game_server/init', Init)
             response = init("bigredrobot", logo_msg)
             self.arm = response.arm
-        
+            
+            # Subscribe to game_state updates
+            rospy.Subscriber('/game_server/game_state', GameState, self.game_state_callback)
 
-        # Subscribe to game_state updates
-        #rospy.Subscriber('/game_server/game_state', GameState, self.game_state_callback) #### UNCOMMENT IN REAL CODE
 
         # Initialise a service for use by other nodes to get arm (returns True=right, False=left)
         rospy.Service('/bigredrobot/arm', Trigger, self.arm_callback) 

@@ -18,7 +18,7 @@ from baxter_core_msgs.srv import (
 
 import baxter_interface 
 
-USE_PARAMS = False
+USE_PARAMS = True
 
 
 class RobotInterface:

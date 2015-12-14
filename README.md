@@ -7,15 +7,10 @@ Things to test:
     - Make throwing on target / faster / better
     - Left arm stuff
     
-Things to calibrate:
+Things to do:
     - Overhead camera arena bounds
-    - Attack/defense/throw positions
-    
-
-SWITCHES:
-    - game.py TEST_DEBUG = False
-    - main.py CALIBRATE = False
-    * robot\_interface.py USE_PARAMS = False
-    - uncomment lines in main to actually check game phase from game instance
     - add in left arm throw bounds
-    - maybe lower derivative gain back to 0.3-0.4
+    - game.py TEST_DEBUG = False <done>
+    - main.py CALIBRATE = False
+    * robot\_interface.py USE_PARAMS = False <done>
+    - uncomment lines in main to actually check game phase from game instance <done>

@@ -101,13 +101,17 @@ class BaxterCamera:
         return np.array(hf.rpinv(L)*s).flatten()
 
 class OverheadCamera:
-    def __init__(self):
+    def __init__(self, USE_DEPTH_REGISTERED):
         self.FRAME_WIDTH = 640
         self.FRAME_HEIGHT = 400
 
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.capture_callback)
-        self.image_sub_d = rospy.Subscriber("/camera/depth/image_raw", Image, self.depth_callback)
+        if USE_DEPTH_REGISTERED:
+            self.image_sub_d = rospy.Subscriber("/camera/depth_registered/image_raw", Image, self.depth_callback)
+        else:
+            self.image_sub_d = rospy.Subscriber("/camera/depth/image_raw", Image, self.depth_callback)
+
         self.frame = None
         self.depthframe = None
 
